@@ -1,0 +1,57 @@
+Options -Indexes
+Options -MultiViews
+
+RewriteEngine On
+RewriteBase /darousalam/
+
+# Interdire l'accès aux fichiers sensibles
+<FilesMatch "\.(env|sql|log|json|md|sh|htpasswd)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Bloquer l'accès direct aux dossiers src/ et config/
+RewriteRule ^(src|config)/ - [F,L]
+
+# Ne pas réécrire les fichiers et dossiers existants (assets, images...)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# URLs admin propres
+RewriteRule ^admin/?$ index.php?page=admin_dashboard [QSA,L]
+RewriteRule ^admin/commandes?/?$ index.php?page=admin_commandes [QSA,L]
+RewriteRule ^admin/produits?/?$ index.php?page=admin_produits [QSA,L]
+RewriteRule ^admin/stocks?/?$ index.php?page=admin_stocks [QSA,L]
+RewriteRule ^admin/clients?/?$ index.php?page=admin_clients [QSA,L]
+RewriteRule ^admin/categories?/?$ index.php?page=admin_categories [QSA,L]
+RewriteRule ^admin/admins?/?$ index.php?page=admin_admins [QSA,L]
+RewriteRule ^admin/([a-zA-Z0-9_\-]+)/?$ index.php?page=admin_$1 [QSA,L]
+
+# URLs propres : /catalogue -> index.php?page=catalogue
+RewriteRule ^([a-zA-Z0-9_\-]+)/?$ index.php?page=$1 [QSA,L]
+
+# Avec paramètre : /produit/42 -> index.php?page=produit&id=42
+RewriteRule ^([a-zA-Z0-9_\-]+)/([0-9]+)/?$ index.php?page=$1&id=$2 [QSA,L]
+
+# Sécurité : en-têtes HTTP
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Compression Gzip
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript
+</IfModule>
+
+# Cache navigateur pour les assets statiques
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/png  "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType text/css   "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+</IfModule>

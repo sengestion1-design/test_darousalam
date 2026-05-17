@@ -1,0 +1,14 @@
+# Config sensible
+config/database.php
+
+# Uploads
+public/uploads/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# XAMPP
