@@ -19,6 +19,19 @@ jobs:
           password: ${{ secrets.FTP_PASS }}
           port: 22
           local_path: ./
-          remote_path: /darousalam/
+          remote_path: /test_darousalam/
           sftp_only: true
           args: '-o StrictHostKeyChecking=no'
+
+      - name: Fix permissions
+        run: |
+          sshpass -p "${{ secrets.FTP_PASS }}" sftp -o StrictHostKeyChecking=no -P 22 ${{ secrets.FTP_USER }}@${{ secrets.FTP_HOST }} << 'EOF'
+          chmod 755 test_darousalam
+          chmod 644 test_darousalam/.htaccess
+          chmod 644 test_darousalam/index.php
+          chmod 755 test_darousalam/src
+          chmod 755 test_darousalam/views
+          chmod 755 test_darousalam/vendor
+          chmod 755 test_darousalam/public
+          chmod 755 test_darousalam/config
+          EOF
