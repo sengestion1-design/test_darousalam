@@ -12,18 +12,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Deploy via SFTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
-          port: 21
-          protocol: ftp
-          local-dir: ./
-          server-dir: /darousalam/
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            .github/**
-            config/database.php
+          port: 22
+          local_path: ./
+          remote_path: /darousalam/
+          sftp_only: true
+          args: '-o StrictHostKeyChecking=no'
