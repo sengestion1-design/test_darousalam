@@ -100,8 +100,8 @@ class CommandeController
                 $sousTotal = $this->panier->calculerTotal();
 
                 // Vérifier commande minimum de la zone
-                if ((int)$zone['min_commande'] > 0 && $sousTotal < (int)$zone['min_commande']) {
-                    $error = 'Commande minimum de ' . number_format((int)$zone['min_commande'], 0, ',', ' ') . ' FCFA requise pour la zone ' . $zone['nom'] . '.';
+                if (false) {
+                    // pas de commande minimum
                 } else {
                     // Valider le code promo si fourni
                     if (!empty($codePromo)) {
@@ -121,12 +121,9 @@ class CommandeController
                         }
                     }
 
-                    // Calculer frais de livraison réels
+                    // Calculer frais de livraison
                     $apresRemise = $sousTotal - $remise;
-                    $fraisLivraison = (float)$zone['frais'];
-                    if (!is_null($zone['frais_gratuit_si']) && $apresRemise >= (int)$zone['frais_gratuit_si']) {
-                        $fraisLivraison = 0;
-                    }
+                    $fraisLivraison = (float)($zone['frais'] ?? 0);
 
                     $panier = $this->panier->getContenu();
                     $commandeId = $this->commandeModel->creer(
@@ -142,7 +139,7 @@ class CommandeController
                     if ($commandeId) {
                         $this->panier->vider();
 
-                        // Email de confirmation au client
+                        // Emails post-commande
                         try {
                             $db = Database::getInstance();
                             $commande = $db->fetch(
@@ -152,20 +149,38 @@ class CommandeController
                                 [':id' => $commandeId]
                             );
                             $lignes = $db->fetchAll(
-                                "SELECT cd.*, p.image_principale FROM commande_details cd
-                                 LEFT JOIN produits p ON p.id = cd.produit_id
-                                 WHERE cd.commande_id = :id",
+                                "SELECT cd.* FROM commande_details cd WHERE cd.commande_id = :id",
                                 [':id' => $commandeId]
                             );
-                            if ($commande && !empty($commande['client_email'])) {
+                            if ($commande) {
                                 require_once __DIR__ . '/../Services/EmailService.php';
-                                (new EmailService())->envoyerConfirmationCommande($commande, $lignes);
+                                $emailSvc = new EmailService();
+                                // Confirmation au client
+                                if (!empty($commande['client_email'])) {
+                                    $emailSvc->envoyerConfirmationCommande($commande, $lignes);
+                                }
+                                // Notification admin
+                                $emailSvc->envoyerNotificationAdmin($commande, $lignes);
                             }
                         } catch (\Exception $e) {
                             // Ne pas bloquer si l'email échoue
+                            error_log('Email commande erreur: ' . $e->getMessage());
                         }
 
                         flashMessage('success', 'Commande passée avec succès !');
+
+                        // Redirection Wave : lien de paiement direct
+                        if ($modePaiement === 'wave') {
+                            $montantTotal = $sousTotal - $remise + $fraisLivraison;
+                            $wavePhone = '221778164018';
+                            $waveMsg   = 'Commande #' . $commandeId . ' - Darou Salam Business';
+                            $waveUrl   = 'https://wave.com/send?currency=XOF&to=' . $wavePhone
+                                       . '&amount=' . (int)$montantTotal
+                                       . '&note=' . urlencode($waveMsg);
+                            header('Location: ' . $waveUrl);
+                            exit;
+                        }
+
                         redirect('commande_confirmation', ['id' => $commandeId]);
                     } else {
                         $error = 'Une erreur est survenue lors de la commande. Veuillez réessayer.';
@@ -278,7 +293,7 @@ class CommandeController
         }
 
         // Seules les commandes livrées ou avec paiement confirmé ont une facture
-        if (!in_array($commande['statut'], ['livree', 'expediee', 'en_preparation', 'confirmee'])) {
+        if (!in_array($commande['statut'], ['livree', 'en_livraison', 'en_preparation', 'confirmee'])) {
             flashMessage('error', 'La facture sera disponible une fois la commande confirmée.');
             redirect('historique');
             return;
@@ -293,5 +308,38 @@ class CommandeController
 
         require_once __DIR__ . '/../Services/FacturePDFService.php';
         (new FacturePDFService())->generer($commande, $lignes);
+    }
+
+    public function apiStatut(): void
+    {
+        header('Content-Type: application/json');
+
+        if (!isLoggedIn()) {
+            echo json_encode(['error' => 'non_authentifie']);
+            exit;
+        }
+
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) {
+            echo json_encode(['error' => 'id_manquant']);
+            exit;
+        }
+
+        $db = Database::getInstance();
+        $row = $db->fetch(
+            "SELECT statut, updated_at FROM commandes WHERE id = :id AND client_id = :cid",
+            [':id' => $id, ':cid' => $_SESSION['client_id']]
+        );
+
+        if (!$row) {
+            echo json_encode(['error' => 'introuvable']);
+            exit;
+        }
+
+        echo json_encode([
+            'statut'     => $row['statut'],
+            'updated_at' => $row['updated_at'],
+        ]);
+        exit;
     }
 }

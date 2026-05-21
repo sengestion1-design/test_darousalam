@@ -111,10 +111,38 @@ require_once __DIR__ . '/../layouts/header.php';
   font-size:1.5rem;
 }
 .pay-icon-cash{background:linear-gradient(135deg,#fffbeb,#fef3c7);color:#d97706;}
-.pay-icon-om{background:linear-gradient(135deg,#fff7ed,#fed7aa);color:#ea580c;}
-.pay-icon-wave{background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#2563eb;}
+.pay-icon-om{background:linear-gradient(135deg,#ff6600,#ff8c00);color:#fff;}
+.pay-icon-wave{background:linear-gradient(135deg,#0057ff,#0044cc);color:#fff;}
 .pay-name{font-size:.82rem;font-weight:800;color:#1c1917;}
 .pay-sub{font-size:.7rem;color:#9ca3af;}
+/* Bandeau paiement mobile */
+.pay-banner{
+  display:none;margin-top:20px;padding:20px 22px;border-radius:16px;
+  align-items:center;gap:18px;flex-wrap:wrap;
+}
+.pay-banner.show{display:flex;}
+.pay-banner-wave{background:linear-gradient(135deg,#e8f0ff,#d0e2ff);border:2px solid #0057ff;}
+.pay-banner-om{background:linear-gradient(135deg,#fff3e0,#ffe0b2);border:2px solid #ff6600;}
+.pay-banner-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;}
+.pay-banner-wave .pay-banner-icon{background:#0057ff;color:#fff;}
+.pay-banner-om .pay-banner-icon{background:#ff6600;color:#fff;}
+.pay-banner-body{flex:1;min-width:0;}
+.pay-banner-title{font-weight:800;font-size:.95rem;margin-bottom:4px;}
+.pay-banner-wave .pay-banner-title{color:#003dbf;}
+.pay-banner-om .pay-banner-title{color:#c04a00;}
+.pay-banner-text{font-size:.8rem;color:#374151;line-height:1.5;}
+.pay-banner-num{font-size:1.1rem;font-weight:900;letter-spacing:1px;}
+.pay-banner-wave .pay-banner-num{color:#0057ff;}
+.pay-banner-om .pay-banner-num{color:#ff6600;}
+.btn-pay-action{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:11px 20px;border-radius:12px;font-weight:700;font-size:.88rem;
+  text-decoration:none;border:none;cursor:pointer;transition:all .2s;margin-top:10px;
+}
+.btn-wave-action{background:#0057ff;color:#fff;box-shadow:0 4px 14px rgba(0,87,255,.3);}
+.btn-wave-action:hover{background:#0044cc;color:#fff;}
+.btn-om-action{background:#ff6600;color:#fff;box-shadow:0 4px 14px rgba(255,102,0,.3);}
+.btn-om-action:hover{background:#e05500;color:#fff;}
 
 /* Submit */
 .btn-confirm{
@@ -259,14 +287,13 @@ require_once __DIR__ . '/../layouts/header.php';
                 <?php foreach ($zonesDispos as $z): ?>
                 <option value="<?= $z['id'] ?>"
                   data-frais="<?= (int)$z['frais'] ?>"
-                  data-gratuit="<?= $z['frais_gratuit_si'] ?? '' ?>"
-                  data-min="<?= (int)$z['min_commande'] ?>"
+                  data-gratuit=""
+                  data-min="0"
                   data-nom="<?= htmlspecialchars($z['nom']) ?>"
-                  data-delai="<?= (int)$z['delai_jours'] ?>"
+                  data-delai="<?= htmlspecialchars($z['delai'] ?? '') ?>"
                   <?= $selectedZoneId === (int)$z['id'] ? 'selected' : '' ?>>
                   <?= htmlspecialchars($z['nom']) ?>
                   <?php if ((float)$z['frais'] == 0): ?> — Gratuit
-                  <?php elseif (!is_null($z['frais_gratuit_si'])): ?> — <?= number_format((int)$z['frais'], 0, ',', ' ') ?> FCFA (gratuit ≥ <?= number_format((int)$z['frais_gratuit_si'], 0, ',', ' ') ?> FCFA)
                   <?php else: ?> — <?= number_format((int)$z['frais'], 0, ',', ' ') ?> FCFA
                   <?php endif; ?>
                 </option>
@@ -290,7 +317,8 @@ require_once __DIR__ . '/../layouts/header.php';
 
               <div class="pay-opt">
                 <input type="radio" name="mode_paiement" value="a_la_livraison" id="mode_cash"
-                       <?= ($_POST['mode_paiement'] ?? 'a_la_livraison') === 'a_la_livraison' ? 'checked' : '' ?>>
+                       <?= ($_POST['mode_paiement'] ?? 'a_la_livraison') === 'a_la_livraison' ? 'checked' : '' ?>
+                       onchange="onPayChange(this.value)">
                 <label class="pay-lbl" for="mode_cash">
                   <div class="pay-icon pay-icon-cash"><i class="bi bi-cash-coin"></i></div>
                   <div class="pay-name">À la livraison</div>
@@ -300,9 +328,10 @@ require_once __DIR__ . '/../layouts/header.php';
 
               <div class="pay-opt">
                 <input type="radio" name="mode_paiement" value="orange_money" id="mode_om"
-                       <?= ($_POST['mode_paiement'] ?? '') === 'orange_money' ? 'checked' : '' ?>>
+                       <?= ($_POST['mode_paiement'] ?? '') === 'orange_money' ? 'checked' : '' ?>
+                       onchange="onPayChange(this.value)">
                 <label class="pay-lbl" for="mode_om">
-                  <div class="pay-icon pay-icon-om"><i class="bi bi-phone-fill"></i></div>
+                  <div class="pay-icon pay-icon-om" style="font-size:1.1rem;font-weight:900;letter-spacing:-1px;">OM</div>
                   <div class="pay-name">Orange Money</div>
                   <div class="pay-sub">Paiement mobile</div>
                 </label>
@@ -310,16 +339,44 @@ require_once __DIR__ . '/../layouts/header.php';
 
               <div class="pay-opt">
                 <input type="radio" name="mode_paiement" value="wave" id="mode_wave"
-                       <?= ($_POST['mode_paiement'] ?? '') === 'wave' ? 'checked' : '' ?>>
+                       <?= ($_POST['mode_paiement'] ?? '') === 'wave' ? 'checked' : '' ?>
+                       onchange="onPayChange(this.value)">
                 <label class="pay-lbl" for="mode_wave">
-                  <div class="pay-icon pay-icon-wave"><i class="bi bi-phone-fill"></i></div>
+                  <div class="pay-icon pay-icon-wave" style="font-size:1.1rem;font-weight:900;">W</div>
                   <div class="pay-name">Wave</div>
                   <div class="pay-sub">Paiement mobile</div>
                 </label>
               </div>
 
             </div>
+
+            <!-- Bandeau Wave -->
+            <div class="pay-banner pay-banner-wave" id="banner-wave">
+              <div class="pay-banner-icon">W</div>
+              <div class="pay-banner-body">
+                <div class="pay-banner-title">Payer via Wave</div>
+                <div class="pay-banner-text">
+                  Après validation, vous serez redirigé vers Wave pour payer le montant exact.<br>
+                  Numéro marchand : <span class="pay-banner-num">+221 77 816 40 18</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bandeau Orange Money -->
+            <div class="pay-banner pay-banner-om" id="banner-om">
+              <div class="pay-banner-icon">OM</div>
+              <div class="pay-banner-body">
+                <div class="pay-banner-title">Payer via Orange Money</div>
+                <div class="pay-banner-text">
+                  Après validation, envoyez le montant exact à :<br>
+                  <span class="pay-banner-num">+221 77 816 40 18</span><br>
+                  <small style="color:#6b7280;">Composez <strong>#144#</strong> ou utilisez l'app Orange Money</small>
+                </div>
+              </div>
+            </div>
+
           </div>
+
 
         </div>
       </div>
@@ -344,7 +401,7 @@ require_once __DIR__ . '/../layouts/header.php';
       <div class="recap-bd">
 
         <?php foreach ($contenu as $item):
-          $imgUrl = !empty($item['image']) ? '/darousalam/' . $item['image'] : null;
+          $imgUrl = !empty($item['image']) ? BASE_URL . 'public/uploads/' . $item['image'] : null;
         ?>
         <div class="r-item">
           <div class="r-item-left">
@@ -574,7 +631,7 @@ function appliquerPromo() {
     fd.append('code', code);
     fd.append('total', sousTotal);
 
-    fetch('/darousalam/?page=valider_code_promo', { method: 'POST', body: fd })
+    fetch('?page=valider_code_promo', { method: 'POST', body: fd })
         .then(function(r){ return r.json(); })
         .then(function(data) {
             btn.disabled = false;
@@ -616,6 +673,17 @@ function afficherMsg(txt, ok) {
 
 document.getElementById('promo-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); appliquerPromo(); }
+});
+
+function onPayChange(val) {
+    document.getElementById('banner-wave').classList.toggle('show', val === 'wave');
+    document.getElementById('banner-om').classList.toggle('show', val === 'orange_money');
+}
+
+// Afficher le bandeau si option déjà cochée au chargement
+window.addEventListener('DOMContentLoaded', function() {
+    var sel = document.querySelector('input[name="mode_paiement"]:checked');
+    if (sel) onPayChange(sel.value);
 });
 </script>
 
