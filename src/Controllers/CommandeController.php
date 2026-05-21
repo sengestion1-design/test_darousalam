@@ -266,8 +266,43 @@ class CommandeController
             redirect('commande_detail', ['id' => $commandeId]);
         }
 
-        $this->commandeModel->changerStatut($commandeId, 'annulee');
-        flashMessage('info', 'Commande annulée.');
+        $raisonsValides = [
+            'changement_avis', 'erreur_commande', 'delai_trop_long',
+            'prix_eleve', 'commande_doublon', 'autre'
+        ];
+        $raison = $_GET['raison'] ?? '';
+        if (!in_array($raison, $raisonsValides, true)) {
+            flashMessage('error', 'Veuillez indiquer une raison d\'annulation.');
+            redirect('commande_detail', ['id' => $commandeId]);
+        }
+
+        $db = Database::getInstance();
+
+        // Annuler la commande avec la raison
+        $db->query(
+            "UPDATE commandes SET statut='annulee', raison_annulation=:r, updated_at=NOW() WHERE id=:id",
+            [':r' => $raison, ':id' => $commandeId]
+        );
+
+        // Remettre le stock à jour
+        $lignes = $this->commandeModel->getLignes($commandeId);
+        foreach ($lignes as $ligne) {
+            $unite = $ligne['unite'] ?? 'kg';
+            $qte   = (int)$ligne['quantite'];
+            if ($unite === 'carton') {
+                $db->query(
+                    "UPDATE produits SET stock_cartons = stock_cartons + :q WHERE id = :id",
+                    [':q' => $qte, ':id' => $ligne['produit_id']]
+                );
+            } else {
+                $db->query(
+                    "UPDATE produits SET stock_kg = stock_kg + :q WHERE id = :id",
+                    [':q' => $qte, ':id' => $ligne['produit_id']]
+                );
+            }
+        }
+
+        flashMessage('info', 'Commande annulée. Le stock a été remis à jour.');
         redirect('historique');
     }
 

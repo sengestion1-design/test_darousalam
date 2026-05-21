@@ -205,7 +205,7 @@ require_once __DIR__ . '/../layouts/header.php';
           $lignes = $lignesParCmd[$cmd['id']] ?? [];
           $maxShow = 3;
         ?>
-        <tr>
+        <tr data-commande-id="<?= $cmd['id'] ?>">
           <td>
             <span class="ref-badge">
               <i class="bi bi-receipt"></i>
@@ -215,20 +215,21 @@ require_once __DIR__ . '/../layouts/header.php';
           <td>
             <div class="items-preview">
               <?php foreach (array_slice($lignes, 0, $maxShow) as $lg):
-                $img = !empty($lg['image']) ? '/darousalam/' . $lg['image'] : null;
+                $img = !empty($lg['image_principale']) ? BASE_URL . 'public/uploads/' . $lg['image_principale'] : null;
               ?>
                 <?php if ($img): ?>
                 <img src="<?= htmlspecialchars($img) ?>" class="item-thumb" alt="<?= htmlspecialchars($lg['nom_produit']) ?>"
                      title="<?= htmlspecialchars($lg['nom_produit']) ?>"
-                     onerror="this.outerHTML='<div class=\'item-thumb-ph\'><i class=\'bi bi-basket2-fill\'></i></div>'">
+                     onerror="this.style.display='none'">
                 <?php else: ?>
                 <div class="item-thumb-ph" title="<?= htmlspecialchars($lg['nom_produit']) ?>"><i class="bi bi-basket2-fill"></i></div>
                 <?php endif; ?>
               <?php endforeach; ?>
               <?php if (count($lignes) > $maxShow): ?>
-              <span class="items-more">+<?= count($lignes) - $maxShow ?></span>
-              <?php endif; ?>
-              <?php if (empty($lignes)): ?>
+              <span class="items-more">+<?= count($lignes) - $maxShow ?> art.</span>
+              <?php elseif (!empty($lignes)): ?>
+              <span style="font-size:.75rem;color:#6b7280;font-weight:600;margin-left:2px;"><?= count($lignes) ?> art.</span>
+              <?php else: ?>
               <span style="font-size:.75rem;color:#d1d5db;">—</span>
               <?php endif; ?>
             </div>
@@ -239,25 +240,24 @@ require_once __DIR__ . '/../layouts/header.php';
           </td>
           <td class="price-cell"><?= formatPrice((float)$cmd['total']) ?></td>
           <td>
-            <span class="s-badge s-<?= $cmd['statut'] ?>">
-              <i class="bi <?= $s['icon'] ?>"></i> <?= $s['label'] ?>
+            <span class="s-badge s-<?= $cmd['statut'] ?>" data-statut="<?= $cmd['statut'] ?>">
+              <i class="bi <?= $s['icon'] ?>"></i> <span><?= $s['label'] ?></span>
             </span>
           </td>
           <td>
             <a href="<?= BASE_URL ?>?page=commande_detail&id=<?= $cmd['id'] ?>" class="btn-voir">
               <i class="bi bi-eye-fill"></i> Voir
             </a>
-            <?php if (in_array($cmd['statut'], ['confirmee','en_preparation','en_cours','expediee','livree'])): ?>
+            <?php if (in_array($cmd['statut'], ['confirmee','en_preparation','en_cours','en_livraison','livree'])): ?>
             <a href="<?= BASE_URL ?>?page=commande_facture&id=<?= $cmd['id'] ?>"
                class="btn-pdf" title="Télécharger la facture PDF" target="_blank">
               <i class="bi bi-file-earmark-pdf-fill"></i>
             </a>
             <?php endif; ?>
             <?php if (in_array($cmd['statut'], ['en_attente', 'confirmee'])): ?>
-            <a href="<?= BASE_URL ?>?page=commande_annuler&id=<?= $cmd['id'] ?>"
-               class="btn-annuler" onclick="return confirm('Annuler cette commande ?')">
+            <button type="button" class="btn-annuler" onclick="ouvrirModalAnnulation(<?= $cmd['id'] ?>)" title="Annuler">
               <i class="bi bi-x-lg"></i>
-            </a>
+            </button>
             <?php endif; ?>
           </td>
         </tr>
@@ -331,5 +331,149 @@ require_once __DIR__ . '/../layouts/header.php';
 <?php endif; ?>
 
 </div><!-- /container -->
+
+<?php if (!empty($commandes)): ?>
+<script>
+(function() {
+    var terminalStatuts = ['livree', 'annulee'];
+    var icons = {
+        'en_attente':     'bi-hourglass',
+        'confirmee':      'bi-check-circle',
+        'en_preparation': 'bi-box-seam',
+        'en_livraison':   'bi-truck',
+        'livree':         'bi-check-circle-fill',
+        'annulee':        'bi-x-circle-fill'
+    };
+    var labels = {
+        'en_attente':     'En attente',
+        'confirmee':      'Confirmée',
+        'en_preparation': 'En préparation',
+        'en_livraison':   'En livraison',
+        'livree':         'Livrée',
+        'annulee':        'Annulée'
+    };
+
+    // IDs des commandes non terminales
+    var commandeIds = [];
+    <?php foreach ($commandes as $cmd): ?>
+    <?php if (!in_array($cmd['statut'], ['livree', 'annulee'])): ?>
+    commandeIds.push(<?= (int)$cmd['id'] ?>);
+    <?php endif; ?>
+    <?php endforeach; ?>
+
+    if (commandeIds.length === 0) return;
+
+    function pollStatuts() {
+        commandeIds.forEach(function(id) {
+            fetch('<?= BASE_URL ?>?page=api_commande_statut&id=' + id)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) return;
+
+                    var row = document.querySelector('tr[data-commande-id="' + id + '"]');
+                    if (!row) return;
+
+                    var badge = row.querySelector('.s-badge');
+                    if (!badge) return;
+
+                    var oldStatut = badge.getAttribute('data-statut');
+                    if (oldStatut === data.statut) return;
+
+                    // Mettre à jour la classe CSS
+                    badge.className = 's-badge s-' + data.statut;
+                    badge.setAttribute('data-statut', data.statut);
+
+                    // Mettre à jour l'icône
+                    var iconEl = badge.querySelector('i');
+                    if (iconEl) iconEl.className = 'bi ' + (icons[data.statut] || 'bi-circle');
+
+                    // Mettre à jour le label
+                    var labelEl = badge.querySelector('span');
+                    if (labelEl) labelEl.textContent = labels[data.statut] || data.statut;
+
+                    // Retirer de la liste si statut terminal
+                    if (terminalStatuts.indexOf(data.statut) !== -1) {
+                        commandeIds = commandeIds.filter(function(i){ return i !== id; });
+                    }
+                })
+                .catch(function() {});
+        });
+
+        if (commandeIds.length === 0) clearInterval(timer);
+    }
+
+    var timer = setInterval(pollStatuts, 30000);
+})();
+</script>
+<?php endif; ?>
+
+<!-- MODAL ANNULATION -->
+<div id="modalAnnulation" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:22px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#7f1d1d,#dc2626);padding:22px 26px;display:flex;align-items:center;gap:14px;">
+      <div style="width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff;flex-shrink:0;">
+        <i class="bi bi-x-circle-fill"></i>
+      </div>
+      <div>
+        <div style="font-size:1.05rem;font-weight:800;color:#fff;">Annuler la commande</div>
+        <div style="font-size:.78rem;color:rgba(255,255,255,.7);">Cette action est irréversible</div>
+      </div>
+    </div>
+    <div style="padding:26px;">
+      <p style="font-size:.88rem;color:#374151;margin-bottom:20px;">
+        <i class="bi bi-exclamation-triangle-fill" style="color:#f59e0b;"></i>
+        Êtes-vous sûr de vouloir annuler cette commande ? Le stock sera automatiquement remis à jour.
+      </p>
+      <label style="display:block;font-size:.8rem;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">
+        Raison de l'annulation <span style="color:#dc2626;">*</span>
+      </label>
+      <select id="raisonAnnulation" style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:.88rem;font-family:inherit;background:#fafafa;margin-bottom:8px;outline:none;">
+        <option value="">— Choisir une raison —</option>
+        <option value="changement_avis">Changement d'avis</option>
+        <option value="erreur_commande">Erreur dans la commande</option>
+        <option value="delai_trop_long">Délai de livraison trop long</option>
+        <option value="prix_eleve">Prix trop élevé</option>
+        <option value="commande_doublon">Commande en double</option>
+        <option value="autre">Autre raison</option>
+      </select>
+      <div id="raisonErreur" style="display:none;font-size:.78rem;color:#dc2626;margin-bottom:12px;">
+        <i class="bi bi-exclamation-circle"></i> Veuillez choisir une raison.
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button type="button" onclick="fermerModalAnnulation()"
+          style="flex:1;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;background:#f9fafb;font-size:.88rem;font-weight:600;color:#374151;cursor:pointer;">
+          <i class="bi bi-arrow-left"></i> Garder la commande
+        </button>
+        <button type="button" onclick="confirmerAnnulation()"
+          style="flex:1;padding:12px;border:none;border-radius:11px;background:#dc2626;color:#fff;font-size:.88rem;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(220,38,38,.3);">
+          <i class="bi bi-x-circle-fill"></i> Confirmer l'annulation
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var _annulationId = 0;
+function ouvrirModalAnnulation(id) {
+    _annulationId = id;
+    document.getElementById('raisonAnnulation').value = '';
+    document.getElementById('raisonErreur').style.display = 'none';
+    var m = document.getElementById('modalAnnulation');
+    m.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function fermerModalAnnulation() {
+    document.getElementById('modalAnnulation').style.display = 'none';
+    document.body.style.overflow = '';
+}
+function confirmerAnnulation() {
+    var raison = document.getElementById('raisonAnnulation').value;
+    if (!raison) { document.getElementById('raisonErreur').style.display = 'block'; return; }
+    window.location.href = '<?= BASE_URL ?>?page=commande_annuler&id=' + _annulationId + '&raison=' + encodeURIComponent(raison);
+}
+document.getElementById('modalAnnulation').addEventListener('click', function(e) {
+    if (e.target === this) fermerModalAnnulation();
+});
+</script>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>
