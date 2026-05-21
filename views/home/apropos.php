@@ -126,10 +126,10 @@ require_once __DIR__ . '/../layouts/header.php';
                     d'approvisionnement maîtrisée de bout en bout — de la sélection à la livraison.
                 </p>
                 <div class="d-flex gap-3 flex-wrap">
-                    <a href="/darousalam/contact" class="btn btn-warning fw-600 px-4 py-2" style="border-radius:8px;color:#0f2d16;font-weight:600;">
+                    <a href="contact" class="btn btn-warning fw-600 px-4 py-2" style="border-radius:8px;color:#0f2d16;font-weight:600;">
                         <i class="bi bi-envelope-fill me-2"></i>Nous contacter
                     </a>
-                    <a href="/darousalam/catalogue" class="btn btn-outline-light px-4 py-2" style="border-radius:8px;">
+                    <a href="catalogue" class="btn btn-outline-light px-4 py-2" style="border-radius:8px;">
                         <i class="bi bi-grid me-2"></i>Voir le catalogue
                     </a>
                 </div>
@@ -137,11 +137,11 @@ require_once __DIR__ . '/../layouts/header.php';
             <div class="col-lg-6">
                 <!-- Mosaïque photos entrepôt / fruits -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:200px 180px;gap:10px;border-radius:18px;overflow:hidden;">
-                    <img src="/darousalam/photos/PHOTO-2026-05-14-22-33-25.jpg" alt="Entrepôt Darou Salam"
+                    <img src="photos/PHOTO-2026-05-14-22-33-25.jpg" alt="Entrepôt Darou Salam"
                          style="width:100%;height:100%;object-fit:cover;grid-row:span 2;">
-                    <img src="/darousalam/photos/PHOTO-2026-05-14-21-57-40.jpg" alt="Mangues"
+                    <img src="photos/PHOTO-2026-05-14-21-57-40.jpg" alt="Mangues"
                          style="width:100%;height:100%;object-fit:cover;">
-                    <img src="/darousalam/photos/PHOTO-2026-05-14-22-41-06.jpg" alt="Avocats"
+                    <img src="photos/PHOTO-2026-05-14-22-41-06.jpg" alt="Avocats"
                          style="width:100%;height:100%;object-fit:cover;">
                 </div>
             </div>
@@ -199,7 +199,7 @@ require_once __DIR__ . '/../layouts/header.php';
                     <i class="bi bi-truck" style="color:#f97316;"></i>
                 </div>
                 <h6 style="font-weight:700;font-size:1rem;margin-bottom:10px;">Livraison Fiable</h6>
-                <p class="text-muted small" style="line-height:1.7;">Flotte propre, horaires respectés. Nous livrons Auchan, EDK, les supermarchés et hôtels de Dakar dans les délais convenus.</p>
+                <p class="text-muted small" style="line-height:1.7;">Flotte propre, horaires respectés. Nous livrons supermarchés, hôtels et restaurants de Dakar dans les délais convenus.</p>
             </div>
         </div>
         <div class="col-md-6 col-lg-3">
@@ -245,7 +245,7 @@ require_once __DIR__ . '/../layouts/header.php';
                         <div style="position:absolute;left:0;top:4px;width:14px;height:14px;background:#d4a017;border-radius:50%;box-shadow:0 0 0 4px rgba(212,160,23,.2);"></div>
                         <div>
                             <div style="font-weight:700;color:#0f2d16;margin-bottom:4px;">Partenariats grandes surfaces</div>
-                            <p class="text-muted small" style="line-height:1.6;">Signature des premiers contrats avec Auchan Sénégal et EDK, consolidant notre position de fournisseur de référence.</p>
+                            <p class="text-muted small" style="line-height:1.6;">Signature des premiers contrats avec les grandes surfaces et hôtels de Dakar, consolidant notre position de fournisseur de référence.</p>
                         </div>
                     </div>
                     <div class="timeline-item" style="padding-left:34px;position:relative;margin-top:24px;">
@@ -266,11 +266,11 @@ require_once __DIR__ . '/../layouts/header.php';
             </div>
             <div class="col-lg-7">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                    <img src="/darousalam/photos/PHOTO-2026-05-14-22-33-25.jpg" alt="Entrepôt"
+                    <img src="photos/PHOTO-2026-05-14-22-33-25.jpg" alt="Entrepôt"
                          style="width:100%;height:220px;object-fit:cover;border-radius:14px;grid-column:span 2;">
-                    <img src="/darousalam/photos/PHOTO-2026-05-14-22-41-06.jpg" alt="Avocats"
+                    <img src="photos/PHOTO-2026-05-14-22-41-06.jpg" alt="Avocats"
                          style="width:100%;height:160px;object-fit:cover;border-radius:14px;">
-                    <img src="/darousalam/photos/PHOTO-2026-05-14-22-33-13.jpg" alt="Oranges"
+                    <img src="photos/PHOTO-2026-05-14-22-33-13.jpg" alt="Oranges"
                          style="width:100%;height:160px;object-fit:cover;border-radius:14px;">
                 </div>
             </div>
@@ -286,12 +286,6 @@ require_once __DIR__ . '/../layouts/header.php';
     </div>
     <div class="row g-3 justify-content-center">
         <div class="col-6 col-md-3 col-lg-2">
-            <div class="partner-logo"><i class="bi bi-building me-2 text-warning"></i>Auchan</div>
-        </div>
-        <div class="col-6 col-md-3 col-lg-2">
-            <div class="partner-logo"><i class="bi bi-shop me-2 text-warning"></i>EDK</div>
-        </div>
-        <div class="col-6 col-md-3 col-lg-2">
             <div class="partner-logo"><i class="bi bi-cart3 me-2 text-warning"></i>Supermarchés</div>
         </div>
         <div class="col-6 col-md-3 col-lg-2">
@@ -300,7 +294,106 @@ require_once __DIR__ . '/../layouts/header.php';
         <div class="col-6 col-md-3 col-lg-2">
             <div class="partner-logo"><i class="bi bi-cup-straw me-2 text-warning"></i>Restaurants</div>
         </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="partner-logo"><i class="bi bi-building me-2 text-warning"></i>Entreprises</div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="partner-logo"><i class="bi bi-people-fill me-2 text-warning"></i>Particuliers</div>
+        </div>
     </div>
+</div>
+
+<!-- ZONES DE COUVERTURE -->
+<div style="background:#f8fdf9;padding:60px 0;">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="section-badge">Livraison</span>
+      <h2 style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:#0f2d16;">Nos zones de couverture</h2>
+      <p style="color:#6b7280;max-width:520px;margin:12px auto 0;font-size:.95rem;">Nous livrons partout au Sénégal et dans la sous-région ouest-africaine.</p>
+    </div>
+
+    <div class="row g-4 align-items-start">
+
+      <!-- Carte visuelle -->
+      <div class="col-lg-5">
+        <div style="background:linear-gradient(135deg,#0f2d16,#1a5c2a);border-radius:22px;padding:32px;color:#fff;position:relative;overflow:hidden;">
+          <div style="position:absolute;right:-40px;bottom:-40px;width:180px;height:180px;border-radius:50%;background:rgba(212,160,23,.08);pointer-events:none;"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+            <div style="width:48px;height:48px;background:rgba(212,160,23,.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🗺️</div>
+            <div>
+              <div style="font-size:1.1rem;font-weight:800;">Sénégal & Sous-région</div>
+              <div style="font-size:.78rem;color:rgba(255,255,255,.6);">Livraison directe depuis Dakar</div>
+            </div>
+          </div>
+
+          <!-- Zones principales -->
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <?php
+            $zones = [
+              ['ville'=>'Dakar & Banlieue',   'detail'=>'Médina, Plateau, Parcelles, Pikine, Guédiawaye', 'icon'=>'🏙️', 'badge'=>'Principal'],
+              ['ville'=>'Thiès',               'detail'=>'Thiès centre, Mbour, Saly Portudal',             'icon'=>'🌴', 'badge'=>'Régulier'],
+              ['ville'=>'Saint-Louis',         'detail'=>'Saint-Louis, Richard-Toll',                      'icon'=>'🌊', 'badge'=>'Régulier'],
+              ['ville'=>'Ziguinchor',          'detail'=>'Ziguinchor, Cap Skirring',                       'icon'=>'🌿', 'badge'=>'Sur demande'],
+              ['ville'=>'Sous-région',         'detail'=>'Gambie, Guinée-Bissau, Mali',                    'icon'=>'🌍', 'badge'=>'Export'],
+            ];
+            foreach($zones as $z):
+              $badgeColor = $z['badge']==='Principal' ? '#d4a017' : ($z['badge']==='Export' ? '#0ea5e9' : 'rgba(255,255,255,.3)');
+            ?>
+            <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:14px;">
+              <span style="font-size:1.4rem;flex-shrink:0;"><?= $z['icon'] ?></span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:.9rem;"><?= $z['ville'] ?></div>
+                <div style="font-size:.72rem;color:rgba(255,255,255,.55);margin-top:2px;"><?= $z['detail'] ?></div>
+              </div>
+              <span style="background:<?= $badgeColor ?>;color:#fff;font-size:.65rem;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;white-space:nowrap;"><?= $z['badge'] ?></span>
+            </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
+
+      <!-- Infos livraison -->
+      <div class="col-lg-7">
+        <div class="row g-3">
+          <?php
+          $infos = [
+            ['icon'=>'bi-clock-fill',        'color'=>'#1a5c2a', 'bg'=>'#f0fdf4', 'title'=>'Délai Dakar',          'desc'=>'Livraison en 24h à 48h pour Dakar et sa banlieue. Commandez avant 18h pour une livraison le lendemain matin.'],
+            ['icon'=>'bi-geo-alt-fill',       'color'=>'#f97316', 'bg'=>'#fff7ed', 'title'=>'Régions',               'desc'=>'Thiès, Saint-Louis, Ziguinchor : livraison sous 48h à 72h selon la destination.'],
+            ['icon'=>'bi-truck-front-fill',   'color'=>'#0ea5e9', 'bg'=>'#eff6ff', 'title'=>'Transport sécurisé',    'desc'=>'Véhicules réfrigérés pour les longues distances. Fruits conditionnés pour maintenir leur fraîcheur.'],
+            ['icon'=>'bi-globe2',             'color'=>'#7c3aed', 'bg'=>'#f5f3ff', 'title'=>'Export sous-région',   'desc'=>'Gambie, Guinée-Bissau, Mali et Mauritanie sur commande. Tarifs négociés pour les volumes importants.'],
+            ['icon'=>'bi-box-seam-fill',      'color'=>'#d4a017', 'bg'=>'#fffbeb', 'title'=>'Minimum de commande',  'desc'=>'Aucun minimum pour les particuliers. Tarifs dégressifs dès 50 kg pour les professionnels.'],
+            ['icon'=>'bi-telephone-fill',     'color'=>'#dc2626', 'bg'=>'#fef2f2', 'title'=>'Livraison express',    'desc'=>'Besoin urgent ? Contactez-nous sur WhatsApp pour une livraison express le jour même à Dakar.'],
+          ];
+          foreach($infos as $info):
+          ?>
+          <div class="col-md-6">
+            <div style="background:#fff;border:1.5px solid #f0f0f0;border-radius:16px;padding:20px;height:100%;box-shadow:0 2px 12px rgba(0,0,0,.04);transition:all .2s;" onmouseover="this.style.borderColor='#bbf7d0';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#f0f0f0';this.style.transform='translateY(0)'">
+              <div style="width:42px;height:42px;background:<?= $info['bg'] ?>;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
+                <i class="bi <?= $info['icon'] ?>" style="color:<?= $info['color'] ?>;font-size:1.1rem;"></i>
+              </div>
+              <div style="font-weight:800;font-size:.9rem;color:#1c1917;margin-bottom:6px;"><?= $info['title'] ?></div>
+              <div style="font-size:.78rem;color:#6b7280;line-height:1.6;"><?= $info['desc'] ?></div>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+
+        <!-- CTA WhatsApp zone -->
+        <div style="margin-top:20px;background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:1.5px solid #bbf7d0;border-radius:16px;padding:18px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <i class="bi bi-geo-alt-fill" style="font-size:1.6rem;color:#1a5c2a;flex-shrink:0;"></i>
+          <div style="flex:1;min-width:180px;">
+            <div style="font-weight:800;color:#1a5c2a;font-size:.9rem;">Votre zone n'est pas listée ?</div>
+            <div style="font-size:.78rem;color:#4b7a56;margin-top:2px;">Contactez-nous, nous étudions toute nouvelle destination.</div>
+          </div>
+          <a href="https://wa.me/221774715353?text=<?= urlencode('Bonjour, je souhaite savoir si vous livrez dans ma zone.') ?>" target="_blank"
+             style="background:#25d366;color:#fff;padding:10px 20px;border-radius:10px;font-size:.84rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:7px;white-space:nowrap;">
+            <i class="bi bi-whatsapp"></i> Nous contacter
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
 </div>
 
 <!-- CTA CONTACT -->
@@ -313,7 +406,7 @@ require_once __DIR__ . '/../layouts/header.php';
             Contactez-nous pour un devis personnalisé. Livraison en gros, tarifs professionnels, contrats cadres.
         </p>
         <div class="d-flex gap-3 justify-content-center flex-wrap">
-            <a href="/darousalam/contact" class="btn btn-warning px-5 py-2" style="border-radius:8px;font-weight:600;color:#0f2d16;">
+            <a href="contact" class="btn btn-warning px-5 py-2" style="border-radius:8px;font-weight:600;color:#0f2d16;">
                 <i class="bi bi-envelope-fill me-2"></i>Nous écrire
             </a>
             <a href="https://wa.me/221774715353" target="_blank" class="btn px-5 py-2" style="border-radius:8px;background:#25D366;color:#fff;font-weight:600;">
