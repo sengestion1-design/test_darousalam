@@ -2,8 +2,17 @@
 $pageTitle = 'Commande confirmée — ' . APP_NAME;
 require_once __DIR__ . '/../layouts/header.php';
 
-$adresseData = json_decode($commande['adresse_livraison'] ?? '{}', true);
-$dateLivraison = date('d/m/Y', strtotime('+2 days'));
+// adresse_livraison peut être JSON ou texte simple
+$adresseRaw = $commande['adresse_livraison'] ?? '';
+$adresseData = json_decode($adresseRaw, true);
+if (!is_array($adresseData)) {
+    $adresseData = [
+        'adresse'   => $adresseRaw,
+        'ville'     => $commande['ville_livraison'] ?? '',
+        'telephone' => $commande['telephone_livraison'] ?? '',
+    ];
+}
+$dateLivraison = date('d/m/Y', time() + (2 * 86400));
 $reference = $commande['reference'] ?? ('CMD-' . $commande['id']);
 
 $currentStatut = $commande['statut'] ?? 'en_attente';
@@ -12,7 +21,7 @@ $statutIndex = [
     'confirmee'      => 1,
     'en_preparation' => 2,
     'en_cours'       => 2,
-    'expediee'       => 3,
+    'en_livraison'       => 3,
     'livree'         => 4,
     'annulee'        => -1,
 ];
@@ -180,6 +189,47 @@ $isAnnulee  = ($currentStatut === 'annulee');
 .info-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;}
 .info-list li{display:flex;gap:10px;font-size:.83rem;color:#6b7280;align-items:flex-start;}
 .info-list li i{color:var(--vert);flex-shrink:0;margin-top:2px;font-size:.9rem;}
+
+/* BANNIERE PAIEMENT MOBILE */
+.pay-verify-banner{
+  border-radius:20px;padding:28px 32px;margin-bottom:28px;
+  display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;
+}
+.pay-verify-wave{background:linear-gradient(135deg,#dbeafe,#eff6ff);border:2px solid #0057ff;}
+.pay-verify-om{background:linear-gradient(135deg,#ffedd5,#fff7ed);border:2px solid #ff6600;}
+.pay-verify-icon{
+  width:64px;height:64px;border-radius:18px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;font-weight:900;flex-shrink:0;
+}
+.pay-verify-wave .pay-verify-icon{background:#0057ff;color:#fff;}
+.pay-verify-om .pay-verify-icon{background:#ff6600;color:#fff;}
+.pay-verify-body{flex:1;min-width:220px;}
+.pay-verify-title{font-size:1.1rem;font-weight:900;margin-bottom:8px;}
+.pay-verify-wave .pay-verify-title{color:#1e40af;}
+.pay-verify-om .pay-verify-title{color:#c2410c;}
+.pay-verify-steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;}
+.pay-verify-steps li{display:flex;align-items:flex-start;gap:10px;font-size:.84rem;color:#374151;}
+.pay-verify-steps li .step-num{
+  width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;font-weight:800;flex-shrink:0;margin-top:1px;
+}
+.pay-verify-wave .step-num{background:#0057ff;color:#fff;}
+.pay-verify-om .step-num{background:#ff6600;color:#fff;}
+.pay-verify-amount{
+  display:inline-flex;align-items:center;gap:8px;
+  margin-top:14px;padding:10px 18px;border-radius:12px;
+  font-size:1rem;font-weight:900;
+}
+.pay-verify-wave .pay-verify-amount{background:#dbeafe;color:#1d4ed8;border:1.5px solid #93c5fd;}
+.pay-verify-om .pay-verify-amount{background:#ffedd5;color:#c2410c;border:1.5px solid #fdba74;}
+.pay-verify-note{
+  margin-top:12px;padding:10px 14px;border-radius:10px;
+  font-size:.78rem;display:flex;align-items:flex-start;gap:8px;
+}
+.pay-verify-wave .pay-verify-note{background:rgba(0,87,255,.08);color:#1e40af;}
+.pay-verify-om .pay-verify-note{background:rgba(255,102,0,.08);color:#c2410c;}
 </style>
 
 <div class="container py-4">
@@ -190,7 +240,7 @@ $heroConfig = [
     'confirmee'      => ['icon'=>'bi-check-lg',        'title'=>'Commande confirmée !',    'sub'=>'Notre équipe a validé votre commande.',                  'color'=>'#16a34a'],
     'en_preparation' => ['icon'=>'bi-box-seam-fill',   'title'=>'En préparation',          'sub'=>'Nos équipes sélectionnent vos fruits avec soin.',         'color'=>'#7c3aed'],
     'en_cours'       => ['icon'=>'bi-box-seam-fill',   'title'=>'En préparation',          'sub'=>'Nos équipes sélectionnent vos fruits avec soin.',         'color'=>'#7c3aed'],
-    'expediee'       => ['icon'=>'bi-truck',            'title'=>'Commande expédiée !',     'sub'=>'Votre commande est en route vers vous.',                  'color'=>'#0891b2'],
+    'en_livraison'       => ['icon'=>'bi-truck',            'title'=>'Commande expédiée !',     'sub'=>'Votre commande est en route vers vous.',                  'color'=>'#0891b2'],
     'livree'         => ['icon'=>'bi-house-check-fill', 'title'=>'Commande livrée !',      'sub'=>'Votre commande a bien été livrée. Merci pour votre confiance !', 'color'=>'#16a34a'],
     'annulee'        => ['icon'=>'bi-x-circle-fill',   'title'=>'Commande annulée',        'sub'=>'Cette commande a été annulée.',                           'color'=>'#dc2626'],
 ];
@@ -213,6 +263,51 @@ $hc = $heroConfig[$currentStatut] ?? $heroConfig['en_attente'];
     </div>
   </div>
 </div>
+
+<?php $modePaiement = $commande['mode_paiement'] ?? ''; ?>
+<?php if (in_array($modePaiement, ['wave', 'orange_money'])): ?>
+<?php $isWave = $modePaiement === 'wave'; ?>
+<div class="pay-verify-banner <?= $isWave ? 'pay-verify-wave' : 'pay-verify-om' ?>">
+  <div class="pay-verify-icon"><?= $isWave ? 'W' : 'OM' ?></div>
+  <div class="pay-verify-body">
+    <div class="pay-verify-title">
+      <i class="bi bi-clock-history"></i>
+      Nous avons bien reçu votre commande &mdash; vérification du paiement en cours
+    </div>
+    <ul class="pay-verify-steps">
+      <li>
+        <span class="step-num">1</span>
+        <span>Votre commande <strong><?= htmlspecialchars($reference) ?></strong> a été enregistrée avec succès.</span>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <span>
+          <?php if ($isWave): ?>
+            Nous allons vérifier votre paiement Wave sur le numéro <strong>+221 77 816 40 18</strong>.
+          <?php else: ?>
+            Nous allons vérifier votre paiement Orange Money sur le numéro <strong>+221 77 816 40 18</strong>.
+          <?php endif; ?>
+        </span>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <span>Une fois le paiement confirmé, votre commande sera validée et mise en préparation.</span>
+      </li>
+    </ul>
+    <div class="pay-verify-amount">
+      <i class="bi bi-cash-coin"></i>
+      Montant à envoyer : <?= formatPrice((float)$commande['total']) ?>
+    </div>
+    <div class="pay-verify-note">
+      <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:2px;"></i>
+      <span>
+        Si vous n'avez pas encore effectué le paiement, faites-le maintenant en indiquant la référence
+        <strong><?= htmlspecialchars($reference) ?></strong>. Notre équipe valide les paiements dans un délai de <strong>30 minutes</strong>.
+      </span>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <!-- INFO STRIP -->
 <div class="info-strip">
@@ -273,11 +368,13 @@ $hc = $heroConfig[$currentStatut] ?? $heroConfig['en_attente'];
             <div class="tl-name" style="<?= $done ? 'color:var(--vert);' : ($active ? 'color:var(--orange);' : '') ?>"><?= $step['label'] ?></div>
             <div class="tl-desc"><?= $step['desc'] ?></div>
             <?php if ($i === 0): ?>
-              <div class="tl-time"><i class="bi bi-clock-fill"></i> <?= date('d/m/Y H:i', strtotime($commande['created_at'])) ?></div>
+              <?php $createdTs = !empty($commande['created_at']) ? @strtotime($commande['created_at']) : false; if ($createdTs): ?><div class="tl-time"><i class="bi bi-clock-fill"></i> <?= date('d/m/Y H:i', $createdTs) ?></div><?php endif; ?>
             <?php elseif ($active): ?>
               <div class="tl-time"><i class="bi bi-hourglass-split"></i> En cours…</div>
-            <?php elseif ($done && $i === 4 && !empty($commande['updated_at'])): ?>
-              <div class="tl-time"><i class="bi bi-check-circle-fill"></i> <?= date('d/m/Y H:i', strtotime($commande['updated_at'])) ?></div>
+            <?php elseif ($done && $i === 4 && !empty($commande['updated_at'])):
+                $updatedTs = @strtotime($commande['updated_at']); if ($updatedTs): ?>
+              <div class="tl-time"><i class="bi bi-check-circle-fill"></i> <?= date('d/m/Y H:i', $updatedTs) ?></div>
+            <?php endif; ?>
             <?php endif; ?>
           </div>
           <?php endforeach; ?>
@@ -315,7 +412,7 @@ $hc = $heroConfig[$currentStatut] ?? $heroConfig['en_attente'];
       <div class="ds-card-bd">
 
         <?php foreach ($lignes as $ligne):
-          $imgUrl = !empty($ligne['image']) ? '/darousalam/' . $ligne['image'] : null;
+          $imgUrl = null;
         ?>
         <div class="r-item">
           <?php if ($imgUrl): ?>
@@ -330,9 +427,6 @@ $hc = $heroConfig[$currentStatut] ?? $heroConfig['en_attente'];
             <div class="r-item-qty">
                 <?= (int)$ligne['quantite'] ?> <?= $isCarton ? 'carton'.($ligne['quantite']>1?'s':'') : 'kg' ?>
                 &bull; <?= formatPrice((float)$ligne['prix_unitaire']) ?> / <?= $isCarton ? 'carton' : 'kg' ?>
-                <?php if ($isCarton && !empty($ligne['poids_carton_kg'])): ?>
-                <span style="color:#0284c7;"><?= number_format((float)$ligne['poids_carton_kg'],0) ?> kg net / carton</span>
-                <?php endif; ?>
             </div>
           </div>
           <div class="r-item-price"><?= formatPrice((float)$ligne['total_ligne']) ?></div>
@@ -340,7 +434,7 @@ $hc = $heroConfig[$currentStatut] ?? $heroConfig['en_attente'];
         <?php endforeach; ?>
 
         <div class="r-sep"></div>
-        <div class="r-row"><span>Sous-total</span><span><?= formatPrice((float)$commande['sous_total']) ?></span></div>
+        <div class="r-row"><span>Sous-total</span><span><?= formatPrice((float)(($commande['total'] ?? 0) - ($commande['frais_livraison'] ?? 0) + ($commande['remise'] ?? 0))) ?></span></div>
         <?php if (!empty($commande['remise']) && (float)$commande['remise'] > 0): ?>
         <div class="r-row" style="color:#16a34a;">
           <span style="display:flex;align-items:center;gap:6px;">
@@ -385,7 +479,7 @@ $hc = $heroConfig[$currentStatut] ?? $heroConfig['en_attente'];
         <a href="<?= BASE_URL ?>?page=historique" class="btn-cmds">
           <i class="bi bi-grid-1x2"></i> Mes commandes
         </a>
-        <?php if (in_array($currentStatut, ['confirmee','en_preparation','en_cours','expediee','livree'])): ?>
+        <?php if (in_array($currentStatut, ['confirmee','en_preparation','en_cours','en_livraison','livree'])): ?>
         <a href="<?= BASE_URL ?>?page=commande_facture&id=<?= $commande['id'] ?>" target="_blank"
            style="display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 20px;background:#eff6ff;color:#2563eb;border:1.5px solid #bfdbfe;border-radius:12px;font-size:.84rem;font-weight:700;text-decoration:none;transition:all .2s;"
            onmouseover="this.style.background='#2563eb';this.style.color='#fff'" onmouseout="this.style.background='#eff6ff';this.style.color='#2563eb'">
