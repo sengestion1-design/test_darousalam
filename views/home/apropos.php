@@ -319,7 +319,9 @@ require_once __DIR__ . '/../layouts/header.php';
         <div style="background:linear-gradient(135deg,#0f2d16,#1a5c2a);border-radius:22px;padding:32px;color:#fff;position:relative;overflow:hidden;">
           <div style="position:absolute;right:-40px;bottom:-40px;width:180px;height:180px;border-radius:50%;background:rgba(212,160,23,.08);pointer-events:none;"></div>
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-            <div style="width:48px;height:48px;background:rgba(212,160,23,.2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🗺️</div>
+            <div style="width:48px;height:48px;background:rgba(212,160,23,.2);border-radius:14px;display:flex;align-items:center;justify-content:center;">
+              <i class="bi bi-map-fill" style="font-size:1.3rem;color:#d4a017;"></i>
+            </div>
             <div>
               <div style="font-size:1.1rem;font-weight:800;">Sénégal & Sous-région</div>
               <div style="font-size:.78rem;color:rgba(255,255,255,.6);">Livraison directe depuis Dakar</div>
@@ -330,17 +332,17 @@ require_once __DIR__ . '/../layouts/header.php';
           <div style="display:flex;flex-direction:column;gap:10px;">
             <?php
             $zones = [
-              ['ville'=>'Dakar & Banlieue',   'detail'=>'Médina, Plateau, Parcelles, Pikine, Guédiawaye', 'icon'=>'🏙️', 'badge'=>'Principal'],
-              ['ville'=>'Thiès',               'detail'=>'Thiès centre, Mbour, Saly Portudal',             'icon'=>'🌴', 'badge'=>'Régulier'],
-              ['ville'=>'Saint-Louis',         'detail'=>'Saint-Louis, Richard-Toll',                      'icon'=>'🌊', 'badge'=>'Régulier'],
-              ['ville'=>'Ziguinchor',          'detail'=>'Ziguinchor, Cap Skirring',                       'icon'=>'🌿', 'badge'=>'Sur demande'],
-              ['ville'=>'Sous-région',         'detail'=>'Gambie, Guinée-Bissau, Mali',                    'icon'=>'🌍', 'badge'=>'Export'],
+              ['ville'=>'Dakar & Banlieue',   'detail'=>'Médina, Plateau, Parcelles, Pikine, Guédiawaye', 'icon'=>'bi-buildings-fill',      'badge'=>'Principal'],
+              ['ville'=>'Thiès',               'detail'=>'Thiès centre, Mbour, Saly Portudal',             'icon'=>'bi-geo-fill',             'badge'=>'Régulier'],
+              ['ville'=>'Saint-Louis',         'detail'=>'Saint-Louis, Richard-Toll',                      'icon'=>'bi-geo-fill',             'badge'=>'Régulier'],
+              ['ville'=>'Ziguinchor',          'detail'=>'Ziguinchor, Cap Skirring',                       'icon'=>'bi-geo-fill',             'badge'=>'Sur demande'],
+              ['ville'=>'Sous-région',         'detail'=>'Gambie, Guinée-Bissau, Mali',                    'icon'=>'bi-globe-americas',       'badge'=>'Export'],
             ];
             foreach($zones as $z):
               $badgeColor = $z['badge']==='Principal' ? '#d4a017' : ($z['badge']==='Export' ? '#0ea5e9' : 'rgba(255,255,255,.3)');
             ?>
             <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:14px;">
-              <span style="font-size:1.4rem;flex-shrink:0;"><?= $z['icon'] ?></span>
+              <i class="bi <?= $z['icon'] ?>" style="font-size:1.1rem;color:#d4a017;flex-shrink:0;width:20px;text-align:center;"></i>
               <div style="flex:1;min-width:0;">
                 <div style="font-weight:700;font-size:.9rem;"><?= $z['ville'] ?></div>
                 <div style="font-size:.72rem;color:rgba(255,255,255,.55);margin-top:2px;"><?= $z['detail'] ?></div>
@@ -380,7 +382,7 @@ require_once __DIR__ . '/../layouts/header.php';
 
         <!-- CTA WhatsApp zone -->
         <div style="margin-top:20px;background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:1.5px solid #bbf7d0;border-radius:16px;padding:18px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-          <i class="bi bi-geo-alt-fill" style="font-size:1.6rem;color:#1a5c2a;flex-shrink:0;"></i>
+          <i class="bi bi-send-check-fill" style="font-size:1.4rem;color:#1a5c2a;flex-shrink:0;"></i>
           <div style="flex:1;min-width:180px;">
             <div style="font-weight:800;color:#1a5c2a;font-size:.9rem;">Votre zone n'est pas listée ?</div>
             <div style="font-size:.78rem;color:#4b7a56;margin-top:2px;">Contactez-nous, nous étudions toute nouvelle destination.</div>
