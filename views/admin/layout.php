@@ -129,37 +129,37 @@ html,body{height:100%;font-family:var(--font);background:#f5f5f0;color:#1c1917;}
 
 <!-- SIDEBAR -->
 <div class="admin-sidebar">
-  <a href="/darousalam/admin/" class="sidebar-brand">
-    <img src="/darousalam/logo.jpg" alt="Logo">
+  <a href="<?= BASE_URL ?>?page=admin_dashboard" class="sidebar-brand">
+    <img src="<?= BASE_URL ?>logo.jpg" alt="Logo">
     <div><span class="name">Darou Salam</span><span class="tag">Administration</span></div>
   </a>
 
   <div class="sidebar-section">Navigation</div>
-  <a href="/darousalam/admin/" class="sidebar-link <?= ($adminPage??'')==='dashboard'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=admin_dashboard" class="sidebar-link <?= ($adminPage??'')==='dashboard'?'active':'' ?>">
     <i class="bi bi-speedometer2"></i> Tableau de bord
   </a>
-  <a href="/darousalam/admin/commandes" class="sidebar-link <?= ($adminPage??'')==='commandes'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_cmd" class="sidebar-link <?= ($adminPage??'')==='commandes'?'active':'' ?>">
     <i class="bi bi-bag-check"></i> Commandes
   </a>
-  <a href="/darousalam/admin/produits" class="sidebar-link <?= ($adminPage??'')==='produits'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_prd" class="sidebar-link <?= ($adminPage??'')==='produits'?'active':'' ?>">
     <i class="bi bi-box-seam"></i> Produits
   </a>
-  <a href="/darousalam/admin/stocks" class="sidebar-link <?= ($adminPage??'')==='stocks'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_stk" class="sidebar-link <?= ($adminPage??'')==='stocks'?'active':'' ?>">
     <i class="bi bi-bar-chart-line"></i> Stocks
   </a>
-  <a href="<?= BASE_URL ?>?page=admin_stock_mouvements" class="sidebar-link <?= ($adminPage??'')==='stock_mouvements'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_stk_mvt" class="sidebar-link <?= ($adminPage??'')==='stock_mouvements'?'active':'' ?>">
     <i class="bi bi-arrow-left-right"></i> Mouvements
   </a>
-  <a href="<?= BASE_URL ?>?page=admin_rapports" class="sidebar-link <?= ($adminPage??'')==='rapports'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_rpt" class="sidebar-link <?= ($adminPage??'')==='rapports'?'active':'' ?>">
     <i class="bi bi-graph-up-arrow"></i> Rapports
   </a>
-  <a href="<?= BASE_URL ?>?page=admin_livraisons" class="sidebar-link <?= ($adminPage??'')==='livraisons'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_ship" class="sidebar-link <?= ($adminPage??'')==='livraisons'?'active':'' ?>">
     <i class="bi bi-truck"></i> Livraisons
   </a>
-  <a href="<?= BASE_URL ?>?page=admin_livreurs" class="sidebar-link <?= ($adminPage??'')==='livreurs'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_drv" class="sidebar-link <?= ($adminPage??'')==='livreurs'?'active':'' ?>">
     <i class="bi bi-person-vcard"></i> Livreurs
   </a>
-  <a href="<?= BASE_URL ?>?page=admin_contacts" class="sidebar-link <?= ($adminPage??'')==='contacts'?'active':'' ?>" style="position:relative;">
+  <a href="<?= BASE_URL ?>?page=adm_msg" class="sidebar-link <?= ($adminPage??'')==='contacts'?'active':'' ?>" style="position:relative;">
     <i class="bi bi-envelope-fill"></i> Messages
     <?php
       $nbContactsNonLus = 0;
@@ -171,30 +171,42 @@ html,body{height:100%;font-family:var(--font);background:#f5f5f0;color:#1c1917;}
     <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#dc2626;color:#fff;font-size:.6rem;font-weight:900;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;"><?= $nbContactsNonLus ?></span>
     <?php endif; ?>
   </a>
-  <a href="<?= BASE_URL ?>?page=admin_promotions" class="sidebar-link <?= ($adminPage??'')==='promotions'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_avis" class="sidebar-link <?= ($adminPage??'')==='avis'?'active':'' ?>" style="position:relative;">
+    <i class="bi bi-star-fill"></i> Avis clients
+    <?php
+      $nbAvisAttente = 0;
+      try {
+        $r2 = Database::getInstance()->fetch("SELECT COUNT(*) as nb FROM avis WHERE statut='en_attente'");
+        $nbAvisAttente = (int)($r2['nb'] ?? 0);
+      } catch(Exception $e2) {}
+      if ($nbAvisAttente > 0): ?>
+    <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:#f59e0b;color:#fff;font-size:.6rem;font-weight:900;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;"><?= $nbAvisAttente ?></span>
+    <?php endif; ?>
+  </a>
+  <a href="<?= BASE_URL ?>?page=adm_promo" class="sidebar-link <?= ($adminPage??'')==='promotions'?'active':'' ?>">
     <i class="bi bi-tag-fill"></i> Promotions
   </a>
-  <a href="<?= BASE_URL ?>?page=admin_zones_livraison" class="sidebar-link <?= ($adminPage??'')==='zones_livraison'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_zone" class="sidebar-link <?= ($adminPage??'')==='zones_livraison'?'active':'' ?>">
     <i class="bi bi-geo-alt-fill"></i> Zones livr.
   </a>
-  <a href="/darousalam/admin/clients" class="sidebar-link <?= ($adminPage??'')==='clients'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_clt" class="sidebar-link <?= ($adminPage??'')==='clients'?'active':'' ?>">
     <i class="bi bi-people"></i> Clients
   </a>
-  <a href="/darousalam/admin/categories" class="sidebar-link <?= ($adminPage??'')==='categories'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_cat" class="sidebar-link <?= ($adminPage??'')==='categories'?'active':'' ?>">
     <i class="bi bi-grid"></i> Catégories
   </a>
-  <a href="/darousalam/admin/admins" class="sidebar-link <?= ($adminPage??'')==='admins'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_usr" class="sidebar-link <?= ($adminPage??'')==='admins'?'active':'' ?>">
     <i class="bi bi-shield-lock"></i> Administrateurs
   </a>
 
   <div class="sidebar-section">Paramètres</div>
-  <a href="<?= BASE_URL ?>?page=admin_settings" class="sidebar-link <?= ($adminPage??'')==='settings'?'active':'' ?>">
+  <a href="<?= BASE_URL ?>?page=adm_cfg" class="sidebar-link <?= ($adminPage??'')==='settings'?'active':'' ?>">
     <i class="bi bi-gear-fill"></i> Paramètres
   </a>
-  <a href="/darousalam/admin/clients?add=1" class="sidebar-link">
+  <a href="<?= BASE_URL ?>?page=adm_clt_add" class="sidebar-link">
     <i class="bi bi-person-plus-fill"></i> Ajouter utilisateur
   </a>
-  <a href="/darousalam/" target="_blank" class="sidebar-link">
+  <a href="<?= BASE_URL ?>" target="_blank" class="sidebar-link">
     <i class="bi bi-globe"></i> Voir le site
   </a>
 
@@ -206,7 +218,7 @@ html,body{height:100%;font-family:var(--font);background:#f5f5f0;color:#1c1917;}
         <div class="role"><?= htmlspecialchars($_SESSION['admin_role']??'admin') ?></div>
       </div>
     </div>
-    <a href="/darousalam/admin/logout" class="btn-logout">
+    <a href="<?= BASE_URL ?>?page=admin_logout" class="btn-logout">
       <i class="bi bi-box-arrow-left"></i> Déconnexion
     </a>
   </div>
@@ -251,7 +263,7 @@ html,body{height:100%;font-family:var(--font);background:#f5f5f0;color:#1c1917;}
           </div>
           <!-- Footer -->
           <div style="padding:10px 16px;border-top:1px solid #f3f4f6;background:#fafafa;">
-            <a href="<?= BASE_URL ?>?page=admin_commandes"
+            <a href="<?= BASE_URL ?>?page=adm_cmd"
                style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:.76rem;font-weight:700;color:#1a5c2a;text-decoration:none;padding:8px;border-radius:9px;transition:background .12s;"
                onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='transparent'">
               <i class="bi bi-grid-3x3-gap"></i> Voir toutes les commandes
