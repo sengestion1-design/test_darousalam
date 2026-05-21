@@ -300,7 +300,7 @@ $nbArticles = array_sum(array_column($contenu, 'quantite'));
 
     <!-- Items -->
     <?php foreach ($contenu as $key => $item):
-      $imgUrl   = !empty($item['image']) ? '/darousalam/' . $item['image'] : null;
+      $imgUrl   = !empty($item['image']) ? BASE_URL . 'public/uploads/' . $item['image'] : null;
       $isCarton = ($item['unite'] ?? 'kg') === 'carton';
     ?>
     <div class="p-card">
