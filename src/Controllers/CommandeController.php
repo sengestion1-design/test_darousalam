@@ -302,6 +302,40 @@ class CommandeController
             }
         }
 
+        // Emails de notification
+        try {
+            $commandeData = $db->fetch(
+                "SELECT c.*, cl.nom as client_nom, cl.prenom as client_prenom, cl.email as client_email
+                 FROM commandes c LEFT JOIN clients cl ON c.client_id = cl.id
+                 WHERE c.id = :id",
+                [':id' => $commandeId]
+            );
+            if ($commandeData) {
+                require_once __DIR__ . '/../Services/EmailService.php';
+                $emailSvc = new EmailService();
+
+                // Email au client
+                if (!empty($commandeData['client_email'])) {
+                    $emailSvc->envoyerChangementStatut($commandeData, 'en_attente', 'annulee');
+                }
+
+                // Email à l'admin
+                $raisonsLabels = [
+                    'changement_avis'   => 'Changement d\'avis',
+                    'erreur_commande'   => 'Erreur dans la commande',
+                    'delai_trop_long'   => 'Délai de livraison trop long',
+                    'prix_eleve'        => 'Prix trop élevé',
+                    'commande_doublon'  => 'Commande en double',
+                    'autre'             => 'Autre raison',
+                ];
+                $raisonLabel = $raisonsLabels[$raison] ?? $raison;
+                $commandeData['raison_annulation_label'] = $raisonLabel;
+                $emailSvc->envoyerAnnulationAdmin($commandeData, $lignes);
+            }
+        } catch (\Exception $e) {
+            error_log('Email annulation erreur: ' . $e->getMessage());
+        }
+
         flashMessage('info', 'Commande annulée. Le stock a été remis à jour.');
         redirect('historique');
     }

@@ -133,19 +133,30 @@ class EmailService
         $clientNom = trim(($commande['client_prenom'] ?? '') . ' ' . ($commande['client_nom'] ?? ''));
         if (!$clientNom) $clientNom = 'Cher client';
 
-        $adresse = json_decode($commande['adresse_livraison'] ?? '{}', true);
+        $adresseRaw = $commande['adresse_livraison'] ?? '';
+        $adresse = json_decode($adresseRaw, true);
+        if (!is_array($adresse)) {
+            $adresse = [
+                'adresse'   => $adresseRaw,
+                'ville'     => $commande['ville_livraison'] ?? '',
+                'telephone' => $commande['telephone_livraison'] ?? '',
+            ];
+        }
+        $sousTotal = (float)(($commande['total'] ?? 0) - ($commande['frais_livraison'] ?? 0) + ($commande['remise'] ?? 0));
 
         $paiementsLib = [
-            'cash'         => 'Paiement à la livraison',
-            'wave'         => 'Wave',
-            'orange_money' => 'Orange Money',
+            'a_la_livraison' => 'Paiement à la livraison',
+            'cash'           => 'Paiement à la livraison',
+            'wave'           => 'Wave',
+            'orange_money'   => 'Orange Money',
+            'carte'          => 'Carte bancaire',
         ];
         $paiementLib = $paiementsLib[$commande['mode_paiement']] ?? $commande['mode_paiement'];
 
         // Articles
         $lignesHtml  = '';
         $embedImages = [];
-        $uploadBase  = __DIR__ . '/../../';
+        $uploadBase  = __DIR__ . '/../../public/uploads/';
         foreach ($lignes as $i => $ligne) {
             $imgPath = !empty($ligne['image_principale']) ? $uploadBase . $ligne['image_principale'] : '';
             if ($imgPath && file_exists($imgPath)) {
@@ -201,7 +212,7 @@ class EmailService
           ' . $lignesHtml . '
           <tr>
             <td style="padding:12px 0 4px;font-size:.82rem;color:#9ca3af;">Sous-total</td>
-            <td style="padding:12px 0 4px;text-align:right;font-size:.82rem;color:#374151;">' . number_format($commande['sous_total'], 0, ',', ' ') . ' FCFA</td>
+            <td style="padding:12px 0 4px;text-align:right;font-size:.82rem;color:#374151;">' . number_format($sousTotal, 0, ',', ' ') . ' FCFA</td>
           </tr>
           <tr>
             <td style="padding:4px 0;font-size:.82rem;color:#9ca3af;">Livraison</td>
@@ -307,11 +318,12 @@ class EmailService
         ];
 
         $info    = $statutsInfo[$nouveauStatut] ?? ['lib'=>$nouveauStatut,'color'=>'#374151','bg'=>'#f9fafb','icon'=>'·','msg'=>'Le statut de votre commande a été mis à jour.'];
-        $adresse = json_decode($commande['adresse_livraison'] ?? '{}', true);
-        $ville   = $adresse['ville'] ?? '';
+        $adresseRaw2 = $commande['adresse_livraison'] ?? '';
+        $adresse2 = json_decode($adresseRaw2, true);
+        $ville = is_array($adresse2) ? ($adresse2['ville'] ?? '') : ($commande['ville_livraison'] ?? '');
 
         $steps = ['en_attente','confirmee','en_preparation','en_livraison','livree'];
-        $stepLabels = ['En attente','Confirmée','Préparation','Livraison','Livrée'];
+        $stepLabels = ['En attente','Confirmée','Préparation','Expédiée','Livrée'];
         $currentStep = array_search($nouveauStatut, $steps);
         $stepsHtml = '';
         foreach ($steps as $i => $step) {
@@ -437,42 +449,74 @@ class EmailService
         $clientEmail = $commande['client_email'] ?? '';
         if (!$clientEmail) return false;
 
-        $clientNom = trim(($commande['client_prenom'] ?? '') . ' ' . ($commande['client_nom'] ?? ''));
-        $ref       = htmlspecialchars($commande['reference']);
-        $total     = number_format((float)$commande['total'], 0, ',', ' ');
+        $clientNom  = trim(($commande['client_prenom'] ?? '') . ' ' . ($commande['client_nom'] ?? ''));
+        $ref        = $commande['reference'];
+        $total      = (float)($commande['total'] ?? 0);
+        $frais      = (float)($commande['frais_livraison'] ?? 0);
+        $remise     = (float)($commande['remise'] ?? 0);
+        $sousTotal  = $total - $frais + $remise;
 
-        // Générer le PDF en mémoire
-        require_once __DIR__ . '/FacturePDFService.php';
-        require_once __DIR__ . '/../../vendor/autoload.php';
+        // ── Génération PDF via FacturePDFService ─────────────────────────────
+        $pdfContent = null;
+        try {
+            require_once __DIR__ . '/FacturePDFService.php';
+            $pdfContent = (new FacturePDFService())->genererEnMemoire($commande, $lignes);
+        } catch (\Throwable $e) {
+            error_log('Facture PDF erreur: ' . $e->getMessage());
+        }
 
-        $pdfService = new FacturePDFService();
-        $pdfContent = $pdfService->genererEnMemoire($commande, $lignes);
+        // ── Email HTML (résumé) + PDF en pièce jointe ───────────────────────
+        $lignesHtmlEmail = '';
+        foreach ($lignes as $l) {
+            $lignesHtmlEmail .= '
+            <tr>
+              <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:.85rem;color:#1c1917;font-weight:600;">' . htmlspecialchars($l['nom_produit']) . '</td>
+              <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;text-align:center;font-size:.82rem;color:#6b7280;">' . number_format($l['quantite'], 1, ',', ' ') . ' ' . ($l['unite'] ?? 'kg') . '</td>
+              <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-size:.82rem;color:#374151;">' . number_format($l['prix_unitaire'], 0, ',', ' ') . ' FCFA</td>
+              <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:#f97316;">' . number_format($l['total_ligne'], 0, ',', ' ') . ' FCFA</td>
+            </tr>';
+        }
 
         $subject = 'Votre facture ' . $ref . ' — Darou Salam';
+        $pdfNote = $pdfContent ? '<p style="font-size:.8rem;color:#6b7280;margin-top:8px;">📎 Votre facture PDF est jointe à cet email.</p>' : '';
 
         $content = $this->header() . '
-      <tr><td style="background:#fff;padding:44px 40px 32px;text-align:center;">
-        <div style="width:64px;height:64px;background:#dcfce7;border-radius:50%;margin:0 auto 18px;line-height:64px;text-align:center;font-size:1.5rem;border:2px solid #bbf7d0;">✓</div>
-        <div style="font-size:1.2rem;font-weight:900;color:#0f2d16;margin-bottom:10px;font-family:Georgia,serif;">
-          Votre paiement a été confirmé !
+      <tr><td style="background:#fff;padding:36px 40px 28px;">
+        <div style="text-align:center;margin-bottom:28px;">
+          <div style="width:60px;height:60px;background:#dcfce7;border-radius:50%;margin:0 auto 14px;line-height:60px;text-align:center;font-size:1.4rem;border:2px solid #bbf7d0;">✓</div>
+          <div style="font-size:1.15rem;font-weight:900;color:#0f2d16;margin-bottom:8px;font-family:Georgia,serif;">Paiement confirmé !</div>
+          <div style="font-size:.88rem;color:#6b7280;">Bonjour <strong>' . htmlspecialchars($clientNom) . '</strong>, votre paiement pour la commande <strong>' . htmlspecialchars($ref) . '</strong> a bien été reçu.' . $pdfNote . '</div>
         </div>
-        <div style="font-size:.9rem;color:#6b7280;line-height:1.8;margin-bottom:22px;">
-          Bonjour <strong>' . htmlspecialchars($clientNom) . '</strong>,<br>
-          Nous confirmons la réception de votre paiement pour la commande<br>
-          <strong>' . $ref . '</strong> d\'un montant de <strong>' . $total . ' FCFA</strong>.<br><br>
-          Votre facture est disponible en pièce jointe de cet email.
-        </div>
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px 24px;display:inline-block;margin-bottom:24px;">
-          <div style="font-size:.75rem;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Montant payé</div>
-          <div style="font-size:1.6rem;font-weight:900;color:#1a5c2a;">' . $total . ' FCFA</div>
-          <div style="font-size:.75rem;color:#6b7280;margin-top:2px;">Réf : ' . $ref . '</div>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:20px;">
+          <thead><tr style="background:#f0fdf4;">
+            <th style="padding:10px 0;text-align:left;font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #bbf7d0;">Article</th>
+            <th style="padding:10px 0;text-align:center;font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #bbf7d0;">Qté</th>
+            <th style="padding:10px 0;text-align:right;font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #bbf7d0;">Prix unit.</th>
+            <th style="padding:10px 0;text-align:right;font-size:.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #bbf7d0;">Total</th>
+          </tr></thead>
+          <tbody>' . $lignesHtmlEmail . '</tbody>
+        </table>
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+          <tr><td style="font-size:.82rem;color:#9ca3af;padding:4px 0;">Sous-total</td><td style="text-align:right;font-size:.82rem;color:#374151;">' . number_format($sousTotal, 0, ',', ' ') . ' FCFA</td></tr>
+          ' . ($remise > 0 ? '<tr><td style="font-size:.82rem;color:#16a34a;padding:4px 0;">Remise</td><td style="text-align:right;font-size:.82rem;color:#16a34a;">-' . number_format($remise, 0, ',', ' ') . ' FCFA</td></tr>' : '') . '
+          <tr><td style="font-size:.82rem;color:#9ca3af;padding:4px 0;">Livraison</td><td style="text-align:right;font-size:.82rem;color:#374151;">' . ($frais > 0 ? number_format($frais, 0, ',', ' ') . ' FCFA' : 'Gratuite') . '</td></tr>
+          <tr><td colspan="2"><div style="height:1px;background:#e5e7eb;margin:10px 0;"></div></td></tr>
+          <tr>
+            <td style="font-size:1rem;font-weight:800;color:#1c1917;">Total payé</td>
+            <td style="text-align:right;font-size:1.15rem;font-weight:900;color:#1a5c2a;">' . number_format($total, 0, ',', ' ') . ' FCFA</td>
+          </tr>
+        </table>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 18px;font-size:.8rem;color:#15803d;text-align:center;">
+          Merci pour votre confiance ! Pour toute question, contactez-nous sur WhatsApp : <strong>+221 77 471 53 53</strong>
         </div>
       </td></tr>
       ' . $this->footer();
 
-        // Envoyer avec pièce jointe PDF via PHPMailer directement
+        $htmlBody = $this->wrapper($content);
+
+        // Envoi avec PHPMailer directement pour attacher le PDF
+        $mail = new PHPMailer(true);
         try {
-            $mail = new PHPMailer(true);
             $mail->isSMTP();
             $mail->Host       = MAIL_HOST;
             $mail->SMTPAuth   = true;
@@ -481,23 +525,235 @@ class EmailService
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = MAIL_PORT;
             $mail->CharSet    = 'UTF-8';
-            $mail->Timeout    = 10;
+            $mail->Timeout    = 15;
             $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
-            $mail->addAddress($clientEmail, $clientNom);
+            $mail->addReplyTo(MAIL_REPLY_TO, MAIL_FROM_NAME);
+            $mail->addAddress($clientEmail);
             $mail->isHTML(true);
             $mail->Subject = $subject;
-            $mail->Body    = $this->wrapper($content);
-            $mail->AltBody = 'Votre paiement a été confirmé. Votre facture ' . $ref . ' est disponible en pièce jointe.';
-            $mail->addStringAttachment($pdfContent, 'Facture-' . $commande['reference'] . '.pdf', 'base64', 'application/pdf');
+            $mail->Body    = $htmlBody;
+            $mail->AltBody = strip_tags(str_replace(['<br>', '</p>', '</div>', '</tr>'], "\n", $htmlBody));
+
             $logoPath = $this->logoPath();
             if (file_exists($logoPath)) {
                 $mail->addEmbeddedImage($logoPath, 'logo_darousalam', 'logo.jpg', 'base64', 'image/jpeg');
             }
+
+            if ($pdfContent) {
+                $mail->addStringAttachment($pdfContent, 'Facture-' . $ref . '.pdf', 'base64', 'application/pdf');
+            }
+
             $mail->send();
             return true;
         } catch (\Exception $e) {
-            error_log('EmailService facture error: ' . $e->getMessage());
+            error_log('EmailService envoyerFacture erreur: ' . $mail->ErrorInfo);
             return false;
         }
+    }
+
+    public function envoyerNotificationAdmin(array $commande, array $lignes): bool
+    {
+        $adminEmail = MAIL_FROM;
+        if (empty($adminEmail)) return false;
+
+        $ref        = htmlspecialchars($commande['reference'] ?? '');
+        $clientNom  = trim(($commande['client_prenom'] ?? '') . ' ' . ($commande['client_nom'] ?? ''));
+        $clientEmail = htmlspecialchars($commande['client_email'] ?? '');
+        $total      = number_format((float)($commande['total'] ?? 0), 0, ',', ' ');
+        $modePaiement = htmlspecialchars($commande['mode_paiement'] ?? '');
+
+        $adresseRaw = $commande['adresse_livraison'] ?? '';
+        $adresse = json_decode($adresseRaw, true);
+        if (!is_array($adresse)) {
+            $adresse = ['adresse' => $adresseRaw, 'ville' => '', 'telephone' => ''];
+        }
+        $villeHtml = htmlspecialchars($adresse['ville'] ?? '');
+
+        $lignesHtml = '';
+        foreach ($lignes as $l) {
+            $lignesHtml .= '
+            <tr>
+              <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:.85rem;color:#1c1917;font-weight:600;">' . htmlspecialchars($l['nom_produit'] ?? '') . '</td>
+              <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;text-align:center;font-size:.82rem;color:#6b7280;">'
+                . number_format((float)($l['quantite'] ?? 0), 1, ',', ' ') . ' ' . htmlspecialchars($l['unite'] ?? 'kg') . '</td>
+              <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:#f97316;">'
+                . number_format((float)($l['total_ligne'] ?? 0), 0, ',', ' ') . ' FCFA</td>
+            </tr>';
+        }
+
+        $adminUrl = defined('BASE_URL') ? BASE_URL . '/admin?page=commandes&id=' . ($commande['id'] ?? '') : '#';
+        $subject = 'Nouvelle commande ' . ($commande['reference'] ?? '') . ' — ' . $total . ' FCFA';
+
+        $content = $this->header() . '
+      <!-- Alerte admin -->
+      <tr><td style="background:#fffbeb;border-bottom:3px solid #d97706;padding:28px 40px;text-align:center;">
+        <div style="width:56px;height:56px;background:#d97706;border-radius:50%;margin:0 auto 14px;line-height:56px;text-align:center;color:#fff;font-size:1.4rem;font-weight:900;">!</div>
+        <div style="font-size:1.2rem;font-weight:900;color:#92400e;margin-bottom:6px;font-family:Georgia,serif;">Nouvelle commande reçue</div>
+        <div style="font-size:.88rem;color:#b45309;">Référence : <strong>' . $ref . '</strong></div>
+      </td></tr>
+
+      <!-- Infos client -->
+      <tr><td style="background:#fff;padding:24px 40px 16px;">
+        <div style="font-size:.65rem;font-weight:800;color:#9ca3af;text-transform:uppercase;letter-spacing:.12em;margin-bottom:12px;">Client</div>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="font-size:.82rem;color:#9ca3af;padding:4px 0;width:40%;">Nom</td>
+            <td style="font-size:.85rem;font-weight:700;color:#1c1917;">' . htmlspecialchars($clientNom) . '</td>
+          </tr>
+          <tr>
+            <td style="font-size:.82rem;color:#9ca3af;padding:4px 0;">Email</td>
+            <td style="font-size:.82rem;color:#374151;">' . $clientEmail . '</td>
+          </tr>
+          <tr>
+            <td style="font-size:.82rem;color:#9ca3af;padding:4px 0;">Ville</td>
+            <td style="font-size:.82rem;color:#374151;">' . $villeHtml . '</td>
+          </tr>
+          <tr>
+            <td style="font-size:.82rem;color:#9ca3af;padding:4px 0;">Paiement</td>
+            <td style="font-size:.82rem;color:#374151;">' . $modePaiement . '</td>
+          </tr>
+        </table>
+      </td></tr>
+
+      <!-- Articles -->
+      <tr><td style="background:#fff;padding:0 40px 20px;">
+        <div style="font-size:.65rem;font-weight:800;color:#9ca3af;text-transform:uppercase;letter-spacing:.12em;margin-bottom:12px;">Articles commandés</div>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <thead><tr style="background:#f9fafb;">
+            <th style="padding:8px 0;text-align:left;font-size:.72rem;color:#6b7280;font-weight:700;border-bottom:2px solid #e5e7eb;">Produit</th>
+            <th style="padding:8px 0;text-align:center;font-size:.72rem;color:#6b7280;font-weight:700;border-bottom:2px solid #e5e7eb;">Qté</th>
+            <th style="padding:8px 0;text-align:right;font-size:.72rem;color:#6b7280;font-weight:700;border-bottom:2px solid #e5e7eb;">Total</th>
+          </tr></thead>
+          <tbody>' . $lignesHtml . '</tbody>
+        </table>
+      </td></tr>
+
+      <!-- Total -->
+      <tr><td style="background:#fff;padding:0 40px 28px;">
+        <div style="background:#f9fafb;border-radius:10px;padding:16px 20px;border:1px solid #e5e7eb;text-align:right;">
+          <span style="font-size:.82rem;color:#9ca3af;">Total commande :</span>
+          <span style="font-size:1.15rem;font-weight:900;color:#f97316;margin-left:12px;">' . $total . ' FCFA</span>
+        </div>
+      </td></tr>
+
+      <!-- CTA admin -->
+      <tr><td style="background:#fff;padding:0 40px 36px;text-align:center;">
+        <a href="' . $adminUrl . '"
+           style="display:inline-block;background:#d97706;color:#fff;padding:14px 40px;border-radius:8px;font-size:.88rem;font-weight:800;text-decoration:none;letter-spacing:.03em;">
+          Voir la commande dans l\'admin
+        </a>
+      </td></tr>
+
+      ' . $this->footer();
+
+        return $this->send($adminEmail, $subject, $this->wrapper($content));
+    }
+
+    public function envoyerAnnulationAdmin(array $commande, array $lignes): bool
+    {
+        $adminEmail = MAIL_FROM;
+        if (empty($adminEmail)) return false;
+
+        $ref         = htmlspecialchars($commande['reference'] ?? '');
+        $clientNom   = trim(($commande['client_prenom'] ?? '') . ' ' . ($commande['client_nom'] ?? ''));
+        $clientEmail = htmlspecialchars($commande['client_email'] ?? '');
+        $total       = number_format((float)($commande['total'] ?? 0), 0, ',', ' ');
+        $raison      = htmlspecialchars($commande['raison_annulation_label'] ?? $commande['raison_annulation'] ?? 'Non précisée');
+
+        $lignesHtml = '';
+        foreach ($lignes as $l) {
+            $lignesHtml .= '<tr>
+              <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:.83rem;color:#1c1917;font-weight:600;">' . htmlspecialchars($l['nom_produit'] ?? '') . '</td>
+              <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:center;font-size:.8rem;color:#6b7280;">' . number_format((float)($l['quantite'] ?? 0), 1, ',', ' ') . ' ' . htmlspecialchars($l['unite'] ?? 'kg') . '</td>
+              <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:700;color:#dc2626;">' . number_format((float)($l['total_ligne'] ?? 0), 0, ',', ' ') . ' FCFA</td>
+            </tr>';
+        }
+
+        $adminUrl = BASE_URL . '?page=adm_cmd';
+        $subject  = '⚠️ Commande annulée ' . $ref . ' — ' . $total . ' FCFA';
+
+        $content = $this->header() . '
+      <tr><td style="background:#fef2f2;border-bottom:3px solid #dc2626;padding:28px 40px;text-align:center;">
+        <div style="width:56px;height:56px;background:#dc2626;border-radius:50%;margin:0 auto 14px;line-height:56px;text-align:center;color:#fff;font-size:1.5rem;font-weight:900;">✕</div>
+        <div style="font-size:1.2rem;font-weight:900;color:#7f1d1d;margin-bottom:6px;font-family:Georgia,serif;">Commande annulée par le client</div>
+        <div style="font-size:.88rem;color:#991b1b;">Référence : <strong>' . $ref . '</strong></div>
+      </td></tr>
+
+      <tr><td style="background:#fff;padding:24px 40px;">
+        <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:1.3rem;">⚠️</span>
+          <div>
+            <div style="font-size:.78rem;font-weight:800;color:#991b1b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Raison de l\'annulation</div>
+            <div style="font-size:.92rem;font-weight:700;color:#7f1d1d;">' . $raison . '</div>
+          </div>
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:18px;">
+          <tr>
+            <td style="padding:6px 0;font-size:.82rem;color:#9ca3af;">Client</td>
+            <td style="padding:6px 0;font-size:.82rem;font-weight:700;color:#1c1917;text-align:right;">' . htmlspecialchars($clientNom) . ' &lt;' . $clientEmail . '&gt;</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:.82rem;color:#9ca3af;">Total annulé</td>
+            <td style="padding:6px 0;font-size:.9rem;font-weight:900;color:#dc2626;text-align:right;">' . $total . ' FCFA</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:.82rem;color:#9ca3af;">Mode de paiement</td>
+            <td style="padding:6px 0;font-size:.82rem;font-weight:700;color:#1c1917;text-align:right;">' . htmlspecialchars($commande['mode_paiement'] ?? '') . '</td>
+          </tr>
+        </table>
+
+        <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+          <div style="background:#f9fafb;padding:10px 16px;font-size:.65rem;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:.1em;">Articles annulés</div>
+          <div style="padding:4px 16px;">
+            <table width="100%" cellpadding="0" cellspacing="0">' . $lignesHtml . '</table>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin-top:24px;">
+          <a href="' . $adminUrl . '" style="display:inline-block;background:#1a5c2a;color:#fff;padding:13px 36px;border-radius:8px;font-size:.88rem;font-weight:800;text-decoration:none;">
+            Voir les commandes
+          </a>
+        </div>
+      </td></tr>
+      ' . $this->footer();
+
+        return $this->send($adminEmail, $subject, $this->wrapper($content));
+    }
+
+    public function envoyerBienvenue(array $client): bool
+    {
+        $prenom = htmlspecialchars($client['prenom'] ?? '');
+        $nom    = htmlspecialchars($client['nom'] ?? '');
+        $email  = $client['email'] ?? '';
+        $type   = (($client['type_client'] ?? $client['type'] ?? '') === 'professionnel') ? 'Professionnel' : 'Particulier';
+        $vert   = '#1a5c2a';
+
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:30px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08);">
+<tr><td style="background:linear-gradient(135deg,#050d07,#1a5c2a);padding:36px 40px;text-align:center;">
+<img src="cid:logo_darousalam" alt="Darou Salam" style="height:60px;margin-bottom:12px;"><br>
+<span style="font-size:1.4rem;font-weight:900;color:#fff;">Darou Salam Business</span>
+</td></tr>
+<tr><td style="padding:36px 40px;">
+<h2 style="color:' . $vert . ';font-size:1.3rem;margin-bottom:8px;">Bienvenue ' . $prenom . ' ! 🎉</h2>
+<p style="color:#374151;font-size:.9rem;line-height:1.7;margin-bottom:20px;">Votre compte <strong>' . $type . '</strong> a bien été créé. Vous pouvez dès maintenant parcourir notre catalogue et passer vos premières commandes.</p>
+<table width="100%" cellpadding="12" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin-bottom:24px;">
+<tr><td><span style="font-size:.78rem;color:#6b7280;">Nom</span><br><strong>' . $prenom . ' ' . $nom . '</strong></td>
+<td><span style="font-size:.78rem;color:#6b7280;">Email</span><br><strong>' . htmlspecialchars($email) . '</strong></td>
+<td><span style="font-size:.78rem;color:#6b7280;">Compte</span><br><strong style="color:' . $vert . ';">' . $type . '</strong></td></tr>
+</table>
+<div style="text-align:center;margin-bottom:24px;">
+<a href="' . BASE_URL . '?page=catalogue" style="display:inline-block;padding:13px 30px;background:' . $vert . ';color:#fff;border-radius:10px;font-weight:800;font-size:.9rem;text-decoration:none;">Découvrir le catalogue</a>
+</div>
+</td></tr>
+<tr><td style="background:#f8fafc;padding:16px 40px;text-align:center;border-top:1px solid #e5e7eb;">
+<p style="font-size:.72rem;color:#9ca3af;margin:0;">Darou Salam Business · Dakar, Sénégal · <a href="' . BASE_URL . '" style="color:' . $vert . ';">darousalam-business.com</a></p>
+</td></tr>
+</table></td></tr></table></body></html>';
+
+        return $this->send($email, 'Bienvenue chez Darou Salam Business !', $html);
     }
 }
