@@ -2,10 +2,20 @@
 
 declare(strict_types=1);
 
+// --- Headers de sécurité HTTP ---
+header('X-Frame-Options: SAMEORIGIN');
+header('X-Content-Type-Options: nosniff');
+header('X-XSS-Protection: 1; mode=block');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: https:; frame-src https://www.google.com https://www.google.com/maps/; connect-src 'self';");
+header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()');
+
 // --- Session sécurisée ---
 ini_set('session.cookie_httponly', '1');
 ini_set('session.use_strict_mode', '1');
 ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.cookie_secure', '1');
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -32,7 +42,7 @@ if (empty($_SESSION['client_id']) && !empty($_COOKIE['dsbc_remember'])) {
                 'nom'       => $row['nom'],
                 'prenom'    => $row['prenom'],
                 'email'     => $row['email'],
-                'type'      => $row['type'],
+                'type'      => $row['type_client'] ?? '',
                 'telephone' => $row['telephone'] ?? '',
                 'adresse'   => $row['adresse'] ?? '',
                 'ville'     => $row['ville'] ?? '',
@@ -109,11 +119,62 @@ $routes = [
     'admin_login'     => ['AdminController', 'login'],
     'admin_logout'    => ['AdminController', 'logout'],
     'admin_dashboard' => ['AdminController', 'dashboard'],
+    // alias courts pour contourner les filtres InfinityFree
+    'adm_cmd'         => ['AdminController', 'commandes'],
+    'adm_cmd_chk'     => ['AdminController', 'checkNouvellesCommandes'],
+    'adm_cmd_det'     => ['AdminController', 'commandeDetail'],
+    'adm_cmd_sta'     => ['AdminController', 'changerStatutCommande'],
+    'adm_cmd_pai'     => ['AdminController', 'changerStatutPaiement'],
+    'adm_prd'         => ['AdminController', 'produits'],
+    'adm_clt'         => ['AdminController', 'clients'],
+    'adm_stk'         => ['AdminController', 'stocks'],
+    'adm_stk_mvt'     => ['AdminController', 'stockMouvements'],
+    'adm_stk_add'     => ['AdminController', 'ajouterMouvement'],
+    'adm_prd_add'     => ['AdminController', 'ajouterProduit'],
+    'adm_prd_edt'     => ['AdminController', 'modifierProduit'],
+    'adm_prd_del'     => ['AdminController', 'supprimerProduit'],
+    'adm_clt_add'     => ['AdminController', 'ajouterClient'],
+    'adm_clt_del'     => ['AdminController', 'supprimerClient'],
+    'adm_clt_exp'     => ['AdminController', 'exportClients'],
+    'adm_cat'         => ['AdminController', 'categories'],
+    'adm_cat_add'     => ['AdminController', 'ajouterCategorie'],
+    'adm_cat_edt'     => ['AdminController', 'modifierCategorie'],
+    'adm_cat_del'     => ['AdminController', 'supprimerCategorie'],
+    'adm_msg'         => ['AdminController', 'contacts'],
+    'adm_msg_rep'     => ['AdminController', 'repondreContact'],
+    'adm_cmd_exp'     => ['AdminController', 'exportCommandes'],
+    'adm_cfg'         => ['AdminController', 'settings'],
+    'adm_cfg_save'    => ['AdminController', 'saveSettings'],
+    'adm_cfg_mail'    => ['AdminController', 'testEmail'],
+    'adm_qr_save'     => ['AdminController', 'saveQrCodes'],
+    'adm_usr'         => ['AdminController', 'admins'],
+    'adm_usr_add'     => ['AdminController', 'ajouterAdmin'],
+    'adm_usr_edt'     => ['AdminController', 'modifierAdmin'],
+    'adm_usr_tog'     => ['AdminController', 'toggleAdmin'],
+    'adm_rpt'         => ['AdminController', 'rapports'],
+    'adm_zone'        => ['AdminController', 'zonesLivraison'],
+    'adm_zone_add'    => ['AdminController', 'ajouterZone'],
+    'adm_zone_edt'    => ['AdminController', 'modifierZone'],
+    'adm_zone_del'    => ['AdminController', 'supprimerZone'],
+    'adm_promo'       => ['AdminController', 'promotions'],
+    'adm_promo_add'   => ['AdminController', 'ajouterPromotion'],
+    'adm_promo_edt'   => ['AdminController', 'modifierPromotion'],
+    'adm_promo_del'   => ['AdminController', 'supprimerPromotion'],
+    'adm_ship'        => ['AdminController', 'livraisons'],
+    'adm_drv'         => ['AdminController', 'livreurs'],
+    'adm_drv_det'     => ['AdminController', 'livreurDetail'],
+    'adm_drv_add'     => ['AdminController', 'ajouterLivreur'],
+    'adm_drv_edt'     => ['AdminController', 'modifierLivreur'],
+    'adm_drv_del'     => ['AdminController', 'supprimerLivreur'],
+    'adm_ship_asgn'   => ['AdminController', 'assignerLivreur'],
+    'adm_ship_sta'    => ['AdminController', 'changerStatutLivraison'],
+    'adm_pdf'         => ['AdminController', 'telechargerFacture'],
+    // anciens noms conservés
     'admin_commandes'         => ['AdminController', 'commandes'],
     'admin_check_commandes'   => ['AdminController', 'checkNouvellesCommandes'],
     'admin_commande_detail'   => ['AdminController', 'commandeDetail'],
     'admin_commande_statut'   => ['AdminController', 'changerStatutCommande'],
-    'admin_commande_paiement' => ['AdminController', 'changerStatutPaiement'],
+    'admin_commande_paiement' => ['AdminController', 'commandeDetail'],
     'admin_produits'  => ['AdminController', 'produits'],
     'admin_clients'   => ['AdminController', 'clients'],
     'admin_stocks'            => ['AdminController', 'stocks'],
@@ -157,6 +218,9 @@ $routes = [
     'admin_livraison_statut'        => ['AdminController', 'changerStatutLivraison'],
     'admin_facture_pdf'             => ['AdminController', 'telechargerFacture'],
 
+    // Newsletter
+    'newsletter_subscribe'  => ['NewsletterController', 'subscribe'],
+
     // Commandes
     'checkout'              => ['CommandeController',  'checkout'],
     'valider_code_promo'    => ['CommandeController',  'validerCodePromo'],
@@ -165,7 +229,26 @@ $routes = [
     'commande_detail'       => ['CommandeController',  'detail'],
     'commande_annuler'      => ['CommandeController',  'annuler'],
     'commande_facture'      => ['CommandeController',  'telechargerFacture'],
+    'api_commande_statut'   => ['CommandeController',  'apiStatut'],
 ];
+
+// --- Routes directes : pages statiques ---
+if ($page === 'tarifs_pro') {
+    require_once __DIR__ . '/views/tarifs_pro.php';
+    exit;
+}
+if ($page === 'mentions_legales') {
+    require_once __DIR__ . '/views/mentions_legales.php';
+    exit;
+}
+if ($page === 'cgv') {
+    require_once __DIR__ . '/views/cgv.php';
+    exit;
+}
+if ($page === 'faq') {
+    require_once __DIR__ . '/views/faq.php';
+    exit;
+}
 
 if (isset($routes[$page])) {
     [$controllerClass, $method] = $routes[$page];

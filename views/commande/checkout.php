@@ -350,13 +350,30 @@ require_once __DIR__ . '/../layouts/header.php';
 
             </div>
 
+            <?php
+              $db2 = Database::getInstance();
+              $qrWave = $db2->fetch("SELECT valeur FROM settings WHERE cle='qr_wave'");
+              $qrOm   = $db2->fetch("SELECT valeur FROM settings WHERE cle='qr_orange_money'");
+              $qrWaveFile = $qrWave['valeur'] ?? '';
+              $qrOmFile   = $qrOm['valeur']   ?? '';
+            ?>
+
             <!-- Bandeau Wave -->
             <div class="pay-banner pay-banner-wave" id="banner-wave">
+              <?php if ($qrWaveFile): ?>
+              <img src="<?= BASE_URL ?>public/uploads/qrcodes/<?= htmlspecialchars($qrWaveFile) ?>"
+                   style="width:120px;height:120px;border-radius:12px;object-fit:contain;background:#fff;padding:6px;border:2px solid #0057ff;flex-shrink:0;">
+              <?php else: ?>
               <div class="pay-banner-icon">W</div>
+              <?php endif; ?>
               <div class="pay-banner-body">
                 <div class="pay-banner-title">Payer via Wave</div>
                 <div class="pay-banner-text">
-                  Après validation, vous serez redirigé vers Wave pour payer le montant exact.<br>
+                  <?php if ($qrWaveFile): ?>
+                  Scannez le QR code avec votre app Wave pour payer.<br>
+                  <?php else: ?>
+                  Après validation, vous serez redirigé vers Wave pour payer.<br>
+                  <?php endif; ?>
                   Numéro marchand : <span class="pay-banner-num">+221 77 816 40 18</span>
                 </div>
               </div>
@@ -364,11 +381,20 @@ require_once __DIR__ . '/../layouts/header.php';
 
             <!-- Bandeau Orange Money -->
             <div class="pay-banner pay-banner-om" id="banner-om">
+              <?php if ($qrOmFile): ?>
+              <img src="<?= BASE_URL ?>public/uploads/qrcodes/<?= htmlspecialchars($qrOmFile) ?>"
+                   style="width:120px;height:120px;border-radius:12px;object-fit:contain;background:#fff;padding:6px;border:2px solid #ff6600;flex-shrink:0;">
+              <?php else: ?>
               <div class="pay-banner-icon">OM</div>
+              <?php endif; ?>
               <div class="pay-banner-body">
                 <div class="pay-banner-title">Payer via Orange Money</div>
                 <div class="pay-banner-text">
-                  Après validation, envoyez le montant exact à :<br>
+                  <?php if ($qrOmFile): ?>
+                  Scannez le QR code avec votre app Orange Money pour payer.<br>
+                  <?php else: ?>
+                  Envoyez le montant exact à :<br>
+                  <?php endif; ?>
                   <span class="pay-banner-num">+221 77 816 40 18</span><br>
                   <small style="color:#6b7280;">Composez <strong>#144#</strong> ou utilisez l'app Orange Money</small>
                 </div>

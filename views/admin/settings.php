@@ -7,14 +7,14 @@ $successMsg = $_GET['success'] ?? '';
 $errorMsg   = $_GET['error'] ?? '';
 
 $cfg = [];
-foreach ($settings as $s) { $cfg[$s['key']] = $s['value']; }
+foreach ($settings as $s) { $cfg[$s['cle']] = $s['valeur']; }
 ?>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
 
   <!-- Email / SMTP -->
   <div>
-    <form method="POST" action="<?= BASE_URL ?>?page=admin_settings_save">
+    <form method="POST" action="<?= BASE_URL ?>?page=adm_cfg_save">
       <input type="hidden" name="groupe" value="email">
       <div class="a-card" style="margin-bottom:20px;">
         <div class="a-card-head">
@@ -118,7 +118,7 @@ foreach ($settings as $s) { $cfg[$s['key']] = $s['value']; }
 
   <!-- Infos site + Livraison -->
   <div>
-    <form method="POST" action="<?= BASE_URL ?>?page=admin_settings_save">
+    <form method="POST" action="<?= BASE_URL ?>?page=adm_cfg_save">
       <input type="hidden" name="groupe" value="general">
       <div class="a-card" style="margin-bottom:20px;">
         <div class="a-card-head">
@@ -158,7 +158,7 @@ foreach ($settings as $s) { $cfg[$s['key']] = $s['value']; }
       </div>
     </form>
 
-    <form method="POST" action="<?= BASE_URL ?>?page=admin_settings_save">
+    <form method="POST" action="<?= BASE_URL ?>?page=adm_cfg_save">
       <input type="hidden" name="groupe" value="livraison">
       <div class="a-card">
         <div class="a-card-head">
@@ -189,6 +189,70 @@ foreach ($settings as $s) { $cfg[$s['key']] = $s['value']; }
     </form>
   </div>
 
+</div>
+
+<!-- QR CODES PAIEMENT -->
+<div style="margin-top:24px;">
+  <form method="POST" action="<?= BASE_URL ?>?page=adm_qr_save" enctype="multipart/form-data">
+    <div class="a-card">
+      <div class="a-card-head">
+        <div class="a-card-title"><i class="bi bi-qr-code" style="color:var(--vert);"></i> QR Codes de paiement</div>
+      </div>
+      <div style="padding:22px 24px;">
+        <div style="font-size:.8rem;color:#6b7280;margin-bottom:20px;">
+          <i class="bi bi-info-circle"></i> Ces QR codes s'affichent aux clients lors du checkout quand ils choisissent Wave ou Orange Money.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+          <!-- Wave QR -->
+          <div>
+            <label class="form-lbl" style="color:#0057ff;"><i class="bi bi-qr-code-scan"></i> QR Code Wave</label>
+            <?php $qrWave = $cfg['qr_wave'] ?? ''; ?>
+            <?php if ($qrWave): ?>
+            <div style="margin-bottom:12px;text-align:center;">
+              <img src="<?= BASE_URL ?>public/uploads/qrcodes/<?= htmlspecialchars($qrWave) ?>"
+                   style="width:160px;height:160px;border:3px solid #0057ff;border-radius:16px;object-fit:contain;padding:8px;background:#fff;">
+              <div style="font-size:.72rem;color:#0057ff;margin-top:6px;font-weight:600;">QR Code actuel</div>
+            </div>
+            <?php else: ?>
+            <div style="width:160px;height:160px;border:2px dashed #bfdbfe;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#93c5fd;margin-bottom:12px;">
+              <i class="bi bi-qr-code" style="font-size:2rem;"></i>
+              <span style="font-size:.72rem;">Aucun QR code</span>
+            </div>
+            <?php endif; ?>
+            <input type="file" name="qr_wave" accept="image/png,image/jpeg,image/webp"
+              style="width:100%;padding:8px;border:1.5px dashed #bfdbfe;border-radius:9px;font-size:.82rem;cursor:pointer;background:#eff6ff;">
+            <div style="font-size:.7rem;color:#9ca3af;margin-top:4px;">PNG ou JPG recommandé · max 2 Mo</div>
+          </div>
+
+          <!-- Orange Money QR -->
+          <div>
+            <label class="form-lbl" style="color:#ff6600;"><i class="bi bi-qr-code-scan"></i> QR Code Orange Money</label>
+            <?php $qrOm = $cfg['qr_orange_money'] ?? ''; ?>
+            <?php if ($qrOm): ?>
+            <div style="margin-bottom:12px;text-align:center;">
+              <img src="<?= BASE_URL ?>public/uploads/qrcodes/<?= htmlspecialchars($qrOm) ?>"
+                   style="width:160px;height:160px;border:3px solid #ff6600;border-radius:16px;object-fit:contain;padding:8px;background:#fff;">
+              <div style="font-size:.72rem;color:#ff6600;margin-top:6px;font-weight:600;">QR Code actuel</div>
+            </div>
+            <?php else: ?>
+            <div style="width:160px;height:160px;border:2px dashed #fed7aa;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#fdba74;margin-bottom:12px;">
+              <i class="bi bi-qr-code" style="font-size:2rem;"></i>
+              <span style="font-size:.72rem;">Aucun QR code</span>
+            </div>
+            <?php endif; ?>
+            <input type="file" name="qr_orange_money" accept="image/png,image/jpeg,image/webp"
+              style="width:100%;padding:8px;border:1.5px dashed #fed7aa;border-radius:9px;font-size:.82rem;cursor:pointer;background:#fff7ed;">
+            <div style="font-size:.7rem;color:#9ca3af;margin-top:4px;">PNG ou JPG recommandé · max 2 Mo</div>
+          </div>
+
+        </div>
+        <button type="submit" style="margin-top:20px;background:var(--vert);color:#fff;border:none;border-radius:10px;padding:11px 24px;font-size:.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-cloud-upload-fill"></i> Enregistrer les QR codes
+        </button>
+      </div>
+    </div>
+  </form>
 </div>
 
 <?php if($successMsg): ?>
@@ -227,7 +291,7 @@ function testerEmail() {
   res.style.color = '#9ca3af';
   res.textContent = 'Envoi en cours…';
 
-  fetch('<?= BASE_URL ?>?page=admin_settings_test_email', {
+  fetch('<?= BASE_URL ?>?page=adm_cfg_mail', {
     method: 'POST',
     headers: {'Content-Type':'application/x-www-form-urlencoded'},
     body: 'email=' + encodeURIComponent(email)

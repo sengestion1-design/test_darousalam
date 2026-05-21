@@ -7,11 +7,36 @@ class AdminController
         return Database::getInstance();
     }
 
+    private function isValidImage(string $tmpPath): bool
+    {
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $tmpPath);
+        finfo_close($finfo);
+        if (!in_array($mime, $allowedMimes, true)) return false;
+        return (bool) @getimagesize($tmpPath);
+    }
+
     private function requireAdmin(): void
     {
         if (empty($_SESSION['admin_id'])) {
             redirect('admin_login');
         }
+        // Générer un token CSRF admin s'il n'existe pas
+        if (empty($_SESSION['csrf_admin'])) {
+            $_SESSION['csrf_admin'] = bin2hex(random_bytes(32));
+        }
+    }
+
+    private function verifyCsrfAdmin(): void
+    {
+        $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (empty($token) || $token !== ($_SESSION['csrf_admin'] ?? '')) {
+            http_response_code(403);
+            die('Erreur de sécurité CSRF. Veuillez recharger la page.');
+        }
+        // Régénérer après consommation
+        $_SESSION['csrf_admin'] = bin2hex(random_bytes(32));
     }
 
     public function login(): void
@@ -23,6 +48,32 @@ class AdminController
         $error = '';
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // Rate limiting par IP : max 5 tentatives, blocage 10 minutes
+            $maxAttempts  = 5;
+            $blockSeconds = 600;
+            $ip           = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $ip           = trim(explode(',', $ip)[0]);
+            $db_rl        = $this->getDb();
+            $row_rl       = $db_rl->fetch(
+                "SELECT attempts, last_attempt FROM login_attempts WHERE ip=:ip AND type='admin'",
+                [':ip' => $ip]
+            );
+            $attempts    = (int)($row_rl['attempts'] ?? 0);
+            $lastAttempt = $row_rl['last_attempt'] ? strtotime($row_rl['last_attempt']) : 0;
+
+            if ($attempts >= $maxAttempts) {
+                $remaining = $blockSeconds - (time() - $lastAttempt);
+                if ($remaining > 0) {
+                    $minutesLeft = ceil($remaining / 60);
+                    $error = 'Trop de tentatives. Réessayez dans ' . $minutesLeft . ' minute' . ($minutesLeft > 1 ? 's' : '') . '.';
+                    require_once __DIR__ . '/../../views/admin/login.php';
+                    return;
+                } else {
+                    $db_rl->query("DELETE FROM login_attempts WHERE ip=:ip AND type='admin'", [':ip' => $ip]);
+                    $attempts = 0;
+                }
+            }
+
             $email    = trim($_POST['email'] ?? '');
             $password = $_POST['password'] ?? '';
 
@@ -37,11 +88,20 @@ class AdminController
                     );
 
                     if ($admin && password_verify($password, $admin['mot_de_passe'])) {
+                        // Succès : réinitialiser le compteur IP
+                        $db_rl->query("DELETE FROM login_attempts WHERE ip=:ip AND type='admin'", [':ip' => $ip]);
+                        session_regenerate_id(true);
                         $_SESSION['admin_id']   = $admin['id'];
                         $_SESSION['admin_nom']  = $admin['nom'];
                         $_SESSION['admin_role'] = $admin['role'];
                         redirect('admin_dashboard');
                     } else {
+                        // Échec : incrémenter le compteur IP
+                        $db_rl->query(
+                            "INSERT INTO login_attempts (ip, type, attempts, last_attempt) VALUES (:ip,'admin',1,NOW())
+                             ON DUPLICATE KEY UPDATE attempts=attempts+1, last_attempt=NOW()",
+                            [':ip' => $ip]
+                        );
                         $error = 'Email ou mot de passe incorrect.';
                     }
                 } catch (\Exception $e) {
@@ -94,6 +154,26 @@ class AdminController
             "SELECT COUNT(*) as nb FROM commandes WHERE statut = 'en_attente'"
         ) ?: ['nb'=>0];
 
+        // Deltas KPI (comparaison avec hier)
+        $deltaCmd = (int)$statsToday['nb_commandes'] - (int)$statsHier['nb_commandes'];
+        $deltaCli = (int)$clientsToday['nb'] - (int)$clientsHier['nb'];
+
+        // CA du mois en cours
+        $caMois = $db->fetch(
+            "SELECT COALESCE(SUM(total),0) as ca, COUNT(*) as nb
+             FROM commandes
+             WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())
+             AND statut != 'annulee'"
+        ) ?: ['ca'=>0,'nb'=>0];
+
+        // CA de l'année en cours
+        $caAnnuel = $db->fetch(
+            "SELECT COALESCE(SUM(total),0) as ca, COUNT(*) as nb
+             FROM commandes
+             WHERE YEAR(created_at) = YEAR(CURDATE())
+             AND statut != 'annulee'"
+        ) ?: ['ca'=>0,'nb'=>0];
+
         // 7 derniers jours
         $semaine = [];
         $joursSemaine = [];
@@ -133,6 +213,7 @@ class AdminController
                     (SELECT COUNT(*) FROM commande_details cd WHERE cd.commande_id = c.id) as nb_articles,
                     (SELECT COALESCE(SUM(cd2.quantite),0) FROM commande_details cd2 WHERE cd2.commande_id = c.id AND cd2.unite = 'kg') as total_kg,
                     (SELECT COALESCE(SUM(cd3.quantite),0) FROM commande_details cd3 WHERE cd3.commande_id = c.id AND cd3.unite = 'carton') as total_cartons,
+                    (SELECT COALESCE(SUM(cd4.total_ligne),0) FROM commande_details cd4 WHERE cd4.commande_id = c.id) as sous_total,
                     lv.id as livraison_id, lv.statut as livraison_statut,
                     lr.nom as livreur_nom, lr.telephone as livreur_tel
              FROM commandes c
@@ -198,7 +279,7 @@ class AdminController
         $this->requireAdmin();
         $db  = $this->getDb();
         $id  = (int)($_GET['id'] ?? 0);
-        if (!$id) { redirect('admin_commandes'); }
+        if (!$id) { redirect('adm_cmd'); }
 
         $commande = $db->fetch(
             "SELECT c.*, cl.nom as client_nom, cl.prenom as client_prenom,
@@ -211,10 +292,7 @@ class AdminController
         if (!$commande) { redirect('admin_commandes&error=' . urlencode('Commande introuvable.')); }
 
         $lignes = $db->fetchAll(
-            "SELECT cd.*, p.image_principale
-             FROM commande_details cd
-             LEFT JOIN produits p ON p.id = cd.produit_id
-             WHERE cd.commande_id = :id",
+            "SELECT cd.*, p.image_principale FROM commande_details cd LEFT JOIN produits p ON p.id = cd.produit_id WHERE cd.commande_id = :id",
             [':id' => $id]
         );
 
@@ -233,7 +311,8 @@ class AdminController
     public function changerStatutCommande(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_commandes'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_cmd'); }
+        $this->verifyCsrfAdmin();
 
         $db     = $this->getDb();
         $id     = (int)($_POST['id'] ?? 0);
@@ -251,6 +330,7 @@ class AdminController
              WHERE c.id = :id",
             [':id' => $id]
         );
+        if (!$commande) { redirect('adm_cmd'); return; }
         $ancienStatut = $commande['statut'] ?? '';
 
         $db->query("UPDATE commandes SET statut = :s WHERE id = :id", [':s'=>$statut, ':id'=>$id]);
@@ -272,72 +352,45 @@ class AdminController
 
         // Synchroniser le statut de livraison quand commande livrée ou annulée
         if ($ancienStatut !== $statut && in_array($statut, ['livree', 'annulee'])) {
-            $statutLivraison = ($statut === 'livree') ? 'livree' : 'echec';
+            $statutLivraison = ($statut === 'livree') ? 'livree' : 'echouee';
             $dateLivree      = ($statut === 'livree') ? date('Y-m-d H:i:s') : null;
             $db->query(
                 "UPDATE livraisons SET statut = :sl, date_livree = :dl
-                 WHERE commande_id = :cid AND statut NOT IN ('livree','echec')",
+                 WHERE commande_id = :cid AND statut NOT IN ('livree','echouee')",
                 [':sl' => $statutLivraison, ':dl' => $dateLivree, ':cid' => $id]
             );
         }
 
-        // Déduction stock + historique mouvements quand commande livrée
-        if ($ancienStatut !== 'livree' && $statut === 'livree') {
-            $lignes = $db->fetchAll(
-                "SELECT cd.produit_id, cd.quantite, cd.nom_produit, cd.unite
-                 FROM commande_details cd
-                 WHERE cd.commande_id = :cid",
-                [':cid' => $id]
-            );
-            foreach ($lignes as $ligne) {
-                $qte = (float)$ligne['quantite'];
-                // Déduire du stock
-                $db->query(
-                    "UPDATE produits SET stock_kg = GREATEST(0, stock_kg - :q) WHERE id = :pid",
-                    [':q' => $qte, ':pid' => $ligne['produit_id']]
-                );
-                // Enregistrer le mouvement
-                $cartons = ($ligne['unite'] === 'carton') ? (int)$ligne['quantite'] : 0;
-                $qteKg   = ($ligne['unite'] === 'kg')     ? $qte : 0;
-                $unite   = $ligne['unite'] === 'carton' ? 'carton' : 'kg';
-                $db->query(
-                    "INSERT INTO stock_mouvements (produit_id, type, quantite_kg, quantite_cartons, unite, motif, reference, admin_id, created_at)
-                     VALUES (:pid, 'commande', :qte, :cartons, :unite, :motif, :ref, :aid, NOW())",
-                    [
-                        ':pid'     => $ligne['produit_id'],
-                        ':qte'     => $qteKg ?: $qte,
-                        ':cartons' => $cartons,
-                        ':unite'   => $unite,
-                        ':motif'   => 'Commande livrée — ' . $ligne['nom_produit'],
-                        ':ref'     => $commande['reference'] ?? null,
-                        ':aid'     => $_SESSION['admin_id'] ?? null,
-                    ]
-                );
-            }
-        }
+        // Déduction stock désactivée (commande_details sans lien produit_id)
 
         // Envoyer email si le statut a changé et que le client a un email
         if ($commande && $ancienStatut !== $statut && !empty($commande['client_email'])) {
-            require_once __DIR__ . '/../Services/EmailService.php';
-            $emailService = new EmailService();
-            $emailService->envoyerChangementStatut($commande, $ancienStatut, $statut);
+            try {
+                require_once __DIR__ . '/../Services/EmailService.php';
+                (new EmailService())->envoyerChangementStatut($commande, $ancienStatut, $statut);
+            } catch (\Exception $e) {
+                error_log('Email statut erreur: ' . $e->getMessage());
+            }
         }
 
-        $redirectPage = $_POST['redirect'] ?? 'admin_commandes';
+        $allowed = ['adm_cmd','adm_cmd_det','admin_commandes','admin_dashboard'];
+        $retour  = $_POST['retour'] ?? 'adm_cmd';
+        $redirectPage = in_array(strtok($retour, '&'), $allowed, true) ? $retour : 'adm_cmd';
         redirect($redirectPage . '&success=' . urlencode('Statut mis à jour.'));
     }
 
     public function changerStatutPaiement(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_commandes'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_cmd'); return; }
+        $this->verifyCsrfAdmin();
 
         $db     = $this->getDb();
         $id     = (int)($_POST['id'] ?? 0);
         $statut = $_POST['statut_paiement'] ?? '';
-        $valides = ['en_attente', 'partiel', 'paye', 'rembourse'];
+        $valides = ['en_attente', 'paye', 'rembourse'];
 
-        if (!$id || !in_array($statut, $valides)) { redirect('admin_commandes'); return; }
+        if (!$id || !in_array($statut, $valides)) { redirect('adm_cmd'); return; }
 
         $db->query(
             "UPDATE commandes SET statut_paiement = :s WHERE id = :id",
@@ -355,28 +408,30 @@ class AdminController
                     [':id' => $id]
                 );
                 $lignes = $db->fetchAll(
-                    "SELECT * FROM commande_details WHERE commande_id = :id",
+                    "SELECT cd.*, p.image_principale
+                     FROM commande_details cd
+                     LEFT JOIN produits p ON LOWER(p.nom) = LOWER(cd.nom_produit)
+                     WHERE cd.commande_id = :id",
                     [':id' => $id]
                 );
                 if ($commande && !empty($commande['client_email'])) {
                     require_once __DIR__ . '/../Services/EmailService.php';
-                    require_once __DIR__ . '/../Services/FacturePDFService.php';
                     (new EmailService())->envoyerFacture($commande, $lignes);
                 }
             } catch (\Exception $e) {
-                // Ne pas bloquer si l'email échoue
+                error_log('Facture email erreur: ' . $e->getMessage());
             }
         }
 
         flashMessage('success', 'Statut de paiement mis à jour.');
-        redirect('admin_commande_detail', ['id' => $id]);
+        redirect('adm_cmd_det&id=' . $id);
     }
 
     public function telechargerFacture(): void
     {
         $this->requireAdmin();
         $id = (int)($_GET['id'] ?? 0);
-        if (!$id) { redirect('admin_commandes'); return; }
+        if (!$id) { redirect('adm_cmd'); return; }
 
         $db = $this->getDb();
         $commande = $db->fetch(
@@ -387,13 +442,11 @@ class AdminController
             [':id' => $id]
         );
         $lignes = $db->fetchAll(
-            "SELECT cd.*, p.image_principale FROM commande_details cd
-             LEFT JOIN produits p ON p.id = cd.produit_id
-             WHERE cd.commande_id = :id",
+            "SELECT cd.* FROM commande_details cd WHERE cd.commande_id = :id",
             [':id' => $id]
         );
 
-        if (!$commande) { redirect('admin_commandes'); return; }
+        if (!$commande) { redirect('adm_cmd'); return; }
 
         require_once __DIR__ . '/../Services/FacturePDFService.php';
         (new FacturePDFService())->generer($commande, $lignes);
@@ -475,6 +528,7 @@ class AdminController
     {
         $this->requireAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_stock_mouvements'); }
+        $this->verifyCsrfAdmin();
 
         $db             = $this->getDb();
         $produitId      = (int)($_POST['produit_id'] ?? 0);
@@ -565,7 +619,8 @@ class AdminController
     public function ajouterCategorie(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_categories'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_cat'); }
+        $this->verifyCsrfAdmin();
 
         $db     = $this->getDb();
         $nom    = trim($_POST['nom'] ?? '');
@@ -587,12 +642,12 @@ class AdminController
         if (!empty($_FILES['photo']['name'])) {
             $ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
             $allowed = ['jpg','jpeg','png','webp'];
-            if (in_array($ext, $allowed) && $_FILES['photo']['size'] < 5 * 1024 * 1024) {
+            if (in_array($ext, $allowed) && $_FILES['photo']['size'] < 5 * 1024 * 1024 && $this->isValidImage($_FILES['photo']['tmp_name'])) {
                 $filename = 'cat_' . uniqid() . '.' . $ext;
-                $uploadDir = __DIR__ . '/../../photos/';
+                $uploadDir = __DIR__ . '/../../public/uploads/categories/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 if (move_uploaded_file($_FILES['photo']['tmp_name'], $uploadDir . $filename)) {
-                    $imagePath = 'photos/' . $filename;
+                    $imagePath = 'categories/' . $filename;
                 }
             }
         }
@@ -608,7 +663,8 @@ class AdminController
     public function modifierCategorie(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_categories'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_cat'); }
+        $this->verifyCsrfAdmin();
 
         $db     = $this->getDb();
         $id     = (int)($_POST['id'] ?? 0);
@@ -627,13 +683,13 @@ class AdminController
         if (!empty($_FILES['photo']['name'])) {
             $ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
             $allowed = ['jpg','jpeg','png','webp'];
-            if (in_array($ext, $allowed) && $_FILES['photo']['size'] < 5 * 1024 * 1024) {
+            if (in_array($ext, $allowed) && $_FILES['photo']['size'] < 5 * 1024 * 1024 && $this->isValidImage($_FILES['photo']['tmp_name'])) {
                 $filename = 'cat_' . uniqid() . '.' . $ext;
-                $uploadDir = __DIR__ . '/../../photos/';
+                $uploadDir = __DIR__ . '/../../public/uploads/categories/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 if (move_uploaded_file($_FILES['photo']['tmp_name'], $uploadDir . $filename)) {
                     $imageUpdate = ', image=:image';
-                    $params[':image'] = 'photos/' . $filename;
+                    $params[':image'] = 'categories/' . $filename;
                 }
             }
         }
@@ -651,7 +707,7 @@ class AdminController
         $this->requireAdmin();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            redirect('admin_produits');
+            redirect('adm_prd');
         }
 
         $db = $this->getDb();
@@ -687,11 +743,12 @@ class AdminController
         if (!empty($_FILES['photo']['name'])) {
             $ext      = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
             $allowed  = ['jpg','jpeg','png','webp'];
-            if (in_array($ext, $allowed) && $_FILES['photo']['size'] < 5 * 1024 * 1024) {
+            if (in_array($ext, $allowed) && $_FILES['photo']['size'] < 5 * 1024 * 1024 && $this->isValidImage($_FILES['photo']['tmp_name'])) {
                 $filename  = 'PHOTO-' . date('Y-m-d-H-i-s') . '-' . uniqid() . '.' . $ext;
-                $uploadDir = __DIR__ . '/../../photos/';
+                $uploadDir = __DIR__ . '/../../public/uploads/produits/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 if (move_uploaded_file($_FILES['photo']['tmp_name'], $uploadDir . $filename)) {
-                    $imagePath = 'photos/' . $filename;
+                    $imagePath = 'produits/' . $filename;
                 }
             }
         }
@@ -724,7 +781,8 @@ class AdminController
     public function modifierProduit(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin_produits');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('adm_prd');
+        $this->verifyCsrfAdmin();
 
         $db  = $this->getDb();
         $id  = (int)($_POST['id'] ?? 0);
@@ -753,9 +811,10 @@ class AdminController
         if (!empty($_FILES['photo']['name'])) {
             $ext     = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
             $allowed = ['jpg','jpeg','png','webp'];
-            if (in_array($ext, $allowed) && $_FILES['photo']['size'] < 5 * 1024 * 1024) {
+            if (in_array($ext, $allowed) && $_FILES['photo']['size'] < 5 * 1024 * 1024 && $this->isValidImage($_FILES['photo']['tmp_name'])) {
                 $filename  = 'PHOTO-' . date('Y-m-d-H-i-s') . '-' . uniqid() . '.' . $ext;
-                $uploadDir = __DIR__ . '/../../photos/';
+                $uploadDir = __DIR__ . '/../../public/uploads/produits/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 if (move_uploaded_file($_FILES['photo']['tmp_name'], $uploadDir . $filename)) {
                     $imageUpdate = ', image_principale = :img';
                 }
@@ -796,40 +855,42 @@ class AdminController
     public function supprimerProduit(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_produits'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_prd'); return; }
+        $this->verifyCsrfAdmin();
 
         $id = (int)($_POST['id'] ?? 0);
-        if (!$id) { redirect('admin_produits'); return; }
+        if (!$id) { redirect('adm_prd'); return; }
 
         $db = $this->getDb();
         // Vérifier qu'il n'est pas dans des commandes actives
-        $enCommande = $db->fetch(
-            "SELECT COUNT(*) as nb FROM commande_details WHERE produit_id = :id", [':id' => $id]
-        );
-        if ((int)($enCommande['nb'] ?? 0) > 0) {
-            redirect('admin_produits&error=' . urlencode('Ce produit est lié à des commandes et ne peut pas être supprimé. Désactivez-le à la place.'));
-            return;
-        }
+        // Vérification commande_details supprimée (pas de colonne produit_id)
 
         $produit = $db->fetch("SELECT image_principale FROM produits WHERE id = :id", [':id' => $id]);
+
+        // Supprimer les dépendances liées (FK constraints)
+        $db->query("DELETE FROM stock_mouvements WHERE produit_id = :id", [':id' => $id]);
+        $db->query("UPDATE commande_details SET produit_id = NULL WHERE produit_id = :id", [':id' => $id]);
+        $db->query("DELETE FROM stocks WHERE produit_id = :id", [':id' => $id]);
+        $db->query("DELETE FROM avis WHERE produit_id = :id", [':id' => $id]);
         $db->query("DELETE FROM produits WHERE id = :id", [':id' => $id]);
 
         // Supprimer la photo si elle existe
         if (!empty($produit['image_principale'])) {
-            $path = __DIR__ . '/../../' . $produit['image_principale'];
+            $path = __DIR__ . '/../../public/uploads/' . $produit['image_principale'];
             if (file_exists($path)) @unlink($path);
         }
 
-        redirect('admin_produits&success=' . urlencode('Produit supprimé.'));
+        redirect('adm_prd&success=' . urlencode('Produit supprimé.'));
     }
 
     public function supprimerClient(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_clients'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_clt'); return; }
+        $this->verifyCsrfAdmin();
 
         $id = (int)($_POST['id'] ?? 0);
-        if (!$id) { redirect('admin_clients'); return; }
+        if (!$id) { redirect('adm_clt'); return; }
 
         $db = $this->getDb();
         $enCommande = $db->fetch(
@@ -847,10 +908,11 @@ class AdminController
     public function supprimerCategorie(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_categories'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_cat'); return; }
+        $this->verifyCsrfAdmin();
 
         $id = (int)($_POST['id'] ?? 0);
-        if (!$id) { redirect('admin_categories'); return; }
+        if (!$id) { redirect('adm_cat'); return; }
 
         $db = $this->getDb();
         $hasProduits = $db->fetch(
@@ -873,12 +935,12 @@ class AdminController
         // Marquer tous comme lus si demandé
         if (isset($_GET['marquer_lu'])) {
             $db->query("UPDATE contacts SET lu = 1 WHERE id = :id", [':id' => (int)$_GET['marquer_lu']]);
-            redirect('admin_contacts');
+            redirect('adm_msg');
             return;
         }
         if (isset($_GET['supprimer'])) {
             $db->query("DELETE FROM contacts WHERE id = :id", [':id' => (int)$_GET['supprimer']]);
-            redirect('admin_contacts');
+            redirect('adm_msg');
             return;
         }
 
@@ -908,7 +970,8 @@ class AdminController
     public function repondreContact(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_contacts'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_msg'); return; }
+        $this->verifyCsrfAdmin();
 
         $id      = (int)($_POST['contact_id'] ?? 0);
         $sujet   = trim($_POST['sujet'] ?? '');
@@ -916,7 +979,7 @@ class AdminController
 
         if (!$id || empty($message)) {
             $_SESSION['flash_error'] = 'Message vide.';
-            redirect('admin_contacts');
+            redirect('adm_msg');
             return;
         }
 
@@ -924,7 +987,7 @@ class AdminController
         $contact = $db->fetch("SELECT * FROM contacts WHERE id = :id", [':id' => $id]);
 
         if (!$contact) {
-            redirect('admin_contacts');
+            redirect('adm_msg');
             return;
         }
 
@@ -991,9 +1054,10 @@ class AdminController
 
         $commandes = $db->fetchAll(
             "SELECT c.reference, c.created_at, c.statut, c.mode_paiement, c.statut_paiement,
-                    c.sous_total, c.remise, c.frais_livraison, c.total, c.code_promo,
+                    c.remise, c.frais_livraison, c.total, c.code_promo,
+                    (c.total - c.frais_livraison + COALESCE(c.remise,0)) as sous_total,
                     cl.nom, cl.prenom, cl.email, cl.telephone,
-                    c.adresse_livraison
+                    c.adresse_livraison, c.ville_livraison
              FROM commandes c
              LEFT JOIN clients cl ON cl.id = c.client_id
              WHERE c.created_at >= DATE_SUB(NOW(), INTERVAL $interval)
@@ -1010,15 +1074,14 @@ class AdminController
         fputcsv($out, ['Référence','Date','Client','Email','Téléphone','Adresse','Ville','Statut','Paiement','Statut paiement','Sous-total','Remise','Code promo','Frais livraison','Total'], ';');
 
         foreach ($commandes as $c) {
-            $adresse = json_decode($c['adresse_livraison'] ?? '{}', true) ?: [];
             fputcsv($out, [
                 $c['reference'],
                 date('d/m/Y H:i', strtotime($c['created_at'])),
                 trim(($c['prenom'] ?? '') . ' ' . ($c['nom'] ?? '')),
                 $c['email'] ?? '',
                 $c['telephone'] ?? '',
-                $adresse['adresse'] ?? '',
-                $adresse['ville'] ?? '',
+                $c['adresse_livraison'] ?? '',
+                $c['ville_livraison'] ?? '',
                 $c['statut'],
                 $c['mode_paiement'],
                 $c['statut_paiement'],
@@ -1034,10 +1097,49 @@ class AdminController
         exit;
     }
 
+    public function exportClients(): void
+    {
+        $this->requireAdmin();
+        $db = $this->getDb();
+
+        $clients = $db->fetchAll(
+            "SELECT id, nom, prenom, email, telephone, ville, type, statut, created_at
+             FROM clients
+             ORDER BY created_at DESC"
+        ) ?: [];
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="clients-' . date('Y-m-d') . '.csv"');
+        header('Pragma: no-cache');
+
+        $out = fopen('php://output', 'w');
+        fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM UTF-8 pour Excel
+
+        fputcsv($out, ['ID','Nom','Prénom','Email','Téléphone','Ville','Type','Statut','Date inscription'], ';');
+
+        foreach ($clients as $c) {
+            fputcsv($out, [
+                $c['id'],
+                $c['nom'] ?? '',
+                $c['prenom'] ?? '',
+                $c['email'] ?? '',
+                $c['telephone'] ?? '',
+                $c['ville'] ?? '',
+                $c['type'] ?? '',
+                $c['statut'] ?? '',
+                !empty($c['created_at']) ? date('d/m/Y H:i', strtotime($c['created_at'])) : '',
+            ], ';');
+        }
+
+        fclose($out);
+        exit;
+    }
+
     public function ajouterClient(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin_clients');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('adm_clt');
+        $this->verifyCsrfAdmin();
 
         $db       = $this->getDb();
         $nom      = trim($_POST['nom'] ?? '');
@@ -1080,14 +1182,15 @@ class AdminController
     {
         $this->requireAdmin();
         $db = $this->getDb();
-        $settings = $db->fetchAll("SELECT * FROM settings ORDER BY groupe, `key`");
+        $settings = $db->fetchAll("SELECT * FROM settings ORDER BY groupe, cle");
         require_once __DIR__ . '/../../views/admin/settings.php';
     }
 
     public function saveSettings(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_settings'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_cfg'); }
+        $this->verifyCsrfAdmin();
 
         $db     = $this->getDb();
         $groupe = $_POST['groupe'] ?? 'general';
@@ -1102,7 +1205,7 @@ class AdminController
             if (!isset($_POST[$key])) continue;
             $val = trim($_POST[$key]);
             $db->query(
-                "INSERT INTO settings (`key`, `value`) VALUES (:k, :v) ON DUPLICATE KEY UPDATE `value`=:v2",
+                "INSERT INTO settings (cle, valeur) VALUES (:k, :v) ON DUPLICATE KEY UPDATE valeur=:v2",
                 [':k'=>$key, ':v'=>$val, ':v2'=>$val]
             );
         }
@@ -1112,7 +1215,7 @@ class AdminController
             $this->regenererConfigMail($db);
         }
 
-        redirect('admin_settings&success=' . urlencode('Paramètres sauvegardés avec succès.'));
+        redirect('adm_cfg&success=' . urlencode('Paramètres sauvegardés avec succès.'));
     }
 
     private function regenererConfigMail($db): void
@@ -1120,8 +1223,8 @@ class AdminController
         $keys = ['smtp_host','smtp_port','smtp_username','smtp_password','smtp_from_name'];
         $cfg  = [];
         foreach ($keys as $k) {
-            $row = $db->fetch("SELECT `value` FROM settings WHERE `key`=:k", [':k'=>$k]);
-            $cfg[$k] = $row['value'] ?? '';
+            $row = $db->fetch("SELECT valeur FROM settings WHERE cle=:k", [':k'=>$k]);
+            $cfg[$k] = $row['valeur'] ?? '';
         }
 
         $content = "<?php\n"
@@ -1134,6 +1237,44 @@ class AdminController
             . "define('MAIL_REPLY_TO', " . var_export($cfg['smtp_username'], true) . ");\n";
 
         file_put_contents(__DIR__ . '/../../config/mail.php', $content);
+    }
+
+    public function saveQrCodes(): void
+    {
+        $this->requireAdmin();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_cfg'); }
+
+        $db        = $this->getDb();
+        $uploadDir = __DIR__ . '/../../public/uploads/qrcodes/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+        foreach (['qr_wave', 'qr_orange_money'] as $field) {
+            if (empty($_FILES[$field]['tmp_name'])) continue;
+            $file = $_FILES[$field];
+            if ($file['error'] !== UPLOAD_ERR_OK) continue;
+            if ($file['size'] > 2 * 1024 * 1024) continue;
+
+            $mime = mime_content_type($file['tmp_name']);
+            if (!in_array($mime, ['image/png','image/jpeg','image/webp'], true)) continue;
+
+            $ext      = $mime === 'image/png' ? 'png' : ($mime === 'image/webp' ? 'webp' : 'jpg');
+            $filename = $field . '_' . time() . '.' . $ext;
+
+            // Supprimer l'ancien fichier
+            $old = $db->fetch("SELECT valeur FROM settings WHERE cle=:k", [':k' => $field]);
+            if ($old && !empty($old['valeur']) && file_exists($uploadDir . $old['valeur'])) {
+                unlink($uploadDir . $old['valeur']);
+            }
+
+            if (move_uploaded_file($file['tmp_name'], $uploadDir . $filename)) {
+                $db->query(
+                    "INSERT INTO settings (cle, valeur) VALUES (:k, :v) ON DUPLICATE KEY UPDATE valeur=:v2",
+                    [':k' => $field, ':v' => $filename, ':v2' => $filename]
+                );
+            }
+        }
+
+        redirect('adm_cfg&success=' . urlencode('QR codes mis à jour avec succès.'));
     }
 
     public function testEmail(): void
@@ -1182,7 +1323,8 @@ class AdminController
     public function ajouterAdmin(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_admins'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_usr'); }
+        $this->verifyCsrfAdmin();
 
         $db    = $this->getDb();
         $nom   = trim($_POST['nom'] ?? '');
@@ -1210,7 +1352,8 @@ class AdminController
     public function modifierAdmin(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_admins'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_usr'); }
+        $this->verifyCsrfAdmin();
 
         $db    = $this->getDb();
         $id    = (int)($_POST['id'] ?? 0);
@@ -1475,7 +1618,7 @@ class AdminController
 
         if (!$livreur) {
             flashMessage('error', 'Livreur introuvable.');
-            redirect('admin_livreurs');
+            redirect('adm_drv');
             return;
         }
 
@@ -1498,7 +1641,8 @@ class AdminController
     public function ajouterLivreur(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_livreurs'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_drv'); return; }
+        $this->verifyCsrfAdmin();
 
         $nom       = trim($_POST['nom'] ?? '');
         $telephone = trim($_POST['telephone'] ?? '');
@@ -1507,7 +1651,7 @@ class AdminController
 
         if ($nom === '' || $telephone === '') {
             $_SESSION['flash_error'] = 'Nom et téléphone sont obligatoires.';
-            redirect('admin_livreurs');
+            redirect('adm_drv');
             return;
         }
 
@@ -1518,13 +1662,14 @@ class AdminController
         );
 
         $_SESSION['flash_success'] = 'Livreur ajouté avec succès.';
-        redirect('admin_livreurs');
+        redirect('adm_drv');
     }
 
     public function modifierLivreur(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_livreurs'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_drv'); return; }
+        $this->verifyCsrfAdmin();
 
         $id        = (int)($_POST['id'] ?? 0);
         $nom       = trim($_POST['nom'] ?? '');
@@ -1534,7 +1679,7 @@ class AdminController
 
         if (!$id || $nom === '' || $telephone === '') {
             $_SESSION['flash_error'] = 'Données invalides.';
-            redirect('admin_livreurs');
+            redirect('adm_drv');
             return;
         }
 
@@ -1545,26 +1690,27 @@ class AdminController
         );
 
         $_SESSION['flash_success'] = 'Livreur modifié avec succès.';
-        redirect('admin_livreurs');
+        redirect('adm_drv');
     }
 
     public function supprimerLivreur(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_livreurs'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_drv'); return; }
+        $this->verifyCsrfAdmin();
 
         $id = (int)($_POST['id'] ?? 0);
         if ($id) {
             $this->getDb()->query("DELETE FROM livreurs WHERE id = :id", [':id' => $id]);
             $_SESSION['flash_success'] = 'Livreur supprimé.';
         }
-        redirect('admin_livreurs');
+        redirect('adm_drv');
     }
 
     public function assignerLivreur(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_livraisons'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_ship'); return; }
 
         $db          = $this->getDb();
         $livreurId   = (int)($_POST['livreur_id'] ?? 0);
@@ -1589,7 +1735,7 @@ class AdminController
             }
             $_SESSION['flash_success'] = 'Livreur assigné avec succès.';
             if ($retour === 'admin_commandes') {
-                redirect('admin_commandes');
+                redirect('adm_cmd');
             } else {
                 redirect('admin_commande_detail', ['id' => $commandeId]);
             }
@@ -1615,22 +1761,22 @@ class AdminController
             }
         }
 
-        redirect('admin_livraisons');
+        redirect('adm_ship');
     }
 
     public function changerStatutLivraison(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_livraisons'); return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_ship'); return; }
 
         $livraisonId = (int)($_POST['livraison_id'] ?? 0);
         $statut      = $_POST['statut'] ?? '';
         $commandeId  = (int)($_POST['commande_id'] ?? 0);
         $retour      = $_POST['retour'] ?? '';
-        $statutsValides = ['en_attente', 'assignee', 'en_cours', 'livree', 'echec'];
+        $statutsValides = ['en_attente', 'assignee', 'en_cours', 'livree', 'echouee'];
 
         if ($livraisonId <= 0 || !in_array($statut, $statutsValides, true)) {
-            redirect('admin_livraisons');
+            redirect('adm_ship');
             return;
         }
 
@@ -1649,11 +1795,11 @@ class AdminController
         }
 
         if ($retour === 'admin_commandes') {
-            redirect('admin_commandes');
+            redirect('adm_cmd');
         } elseif ($commandeId > 0) {
             redirect('admin_commande_detail', ['id' => $commandeId]);
         } else {
-            redirect('admin_livraisons');
+            redirect('adm_ship');
         }
     }
 
@@ -1673,7 +1819,7 @@ class AdminController
     {
         $this->requireAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            redirect('admin_zones_livraison');
+            redirect('adm_zone');
         }
 
         $db          = $this->getDb();
@@ -1710,7 +1856,7 @@ class AdminController
     {
         $this->requireAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            redirect('admin_zones_livraison');
+            redirect('adm_zone');
         }
 
         $db          = $this->getDb();
@@ -1753,7 +1899,7 @@ class AdminController
     {
         $this->requireAdmin();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            redirect('admin_zones_livraison');
+            redirect('adm_zone');
         }
 
         $db = $this->getDb();
@@ -1806,7 +1952,7 @@ class AdminController
     public function ajouterPromotion(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_promotions'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_promo'); }
 
         $db        = $this->getDb();
         $code      = strtoupper(trim($_POST['code'] ?? ''));
@@ -1839,7 +1985,7 @@ class AdminController
     public function modifierPromotion(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_promotions'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_promo'); }
 
         $db       = $this->getDb();
         $id       = (int)($_POST['id'] ?? 0);
@@ -1873,7 +2019,7 @@ class AdminController
     public function supprimerPromotion(): void
     {
         $this->requireAdmin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('admin_promotions'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_promo'); }
 
         $db  = $this->getDb();
         $id  = (int)($_POST['id'] ?? 0);
