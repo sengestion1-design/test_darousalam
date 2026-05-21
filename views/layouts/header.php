@@ -6,6 +6,40 @@
     <title><?= $pageTitle ?? 'Darou Salam Business Company — Fruits Premium au Sénégal' ?></title>
     <meta name="description" content="Darou Salam Business Company — Fournisseur de fruits frais premium à Dakar. Mangues, avocats, oranges livrés aux supermarchés et hôtels du Sénégal.">
 
+    <!-- Open Graph -->
+    <meta property="og:title"       content="<?= htmlspecialchars($pageTitle ?? 'Darou Salam Business Company — Fruits Premium au Sénégal') ?>">
+    <meta property="og:description" content="Fournisseur de fruits frais au Sénégal. Vente au kilo et au carton pour professionnels et particuliers. Livraison Dakar &amp; sous-région.">
+    <meta property="og:type"        content="website">
+    <meta property="og:url"         content="<?= htmlspecialchars(BASE_URL . '?page=' . ($activePage ?? 'accueil')) ?>">
+    <meta property="og:image"       content="<?= BASE_URL ?>logo.jpg">
+    <meta property="og:locale"      content="fr_SN">
+    <meta property="og:site_name"   content="<?= defined('APP_NAME') ? htmlspecialchars(APP_NAME) : 'Darou Salam Business Company' ?>">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:title"       content="<?= htmlspecialchars($pageTitle ?? 'Darou Salam Business Company — Fruits Premium au Sénégal') ?>">
+    <meta name="twitter:description" content="Fournisseur de fruits frais au Sénégal. Vente au kilo et au carton pour professionnels et particuliers. Livraison Dakar &amp; sous-région.">
+
+    <!-- JSON-LD LocalBusiness -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Darou Salam Business Company",
+      "description": "Fournisseur de fruits frais premium au Sénégal",
+      "url": "https://darousalam-business.com",
+      "telephone": "+221 77 000 00 00",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Rue 47×37",
+        "addressLocality": "Dakar Médina",
+        "addressCountry": "SN"
+      },
+      "openingHours": "Mo-Sa 07:00-19:00",
+      "priceRange": "FCFA"
+    }
+    </script>
+
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -33,10 +67,13 @@
             font-family: var(--font-body);
             background: #fff;
             color: #1a1a1a;
-            padding-top: 110px; /* topbar 33px + navbar ~77px sur desktop */
+            padding-top: 110px;
         }
         @media (max-width: 767px) {
-            body { padding-top: 64px; } /* mobile: sans topbar */
+            body { padding-top: 70px; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+            #main-nav { top: 0 !important; touch-action: pan-y; }
+            .navbar-collapse { touch-action: pan-y; }
+            .navbar-toggler { touch-action: manipulation; }
         }
 
         /* ========= TOP BAR ========= */
@@ -222,7 +259,12 @@
         }
     </style>
 </head>
-<body<?= isset($_bodyClass) ? ' class="'.htmlspecialchars($_bodyClass).'"' : '' ?>>
+<body<?php
+  $__bodyClasses = [];
+  if (isset($_bodyClass)) $__bodyClasses[] = htmlspecialchars($_bodyClass);
+  if (isLoggedIn() && (($_GET['page'] ?? 'accueil') === 'accueil')) $__bodyClasses[] = 'has-welcome-banner';
+  echo $__bodyClasses ? ' class="' . implode(' ', $__bodyClasses) . '"' : '';
+?>>
 
 
 <!-- TOP BAR -->
@@ -247,12 +289,22 @@
 <!-- MAIN NAV -->
 <nav id="main-nav" class="navbar navbar-expand-lg" style="<?= (isset($_topBarVisible) && $_topBarVisible === false) ? '' : 'top:33px;' ?>">
     <div class="container">
-        <a class="navbar-brand" href="/darousalam/">
-            <img src="/darousalam/logo.jpg" alt="Darou Salam Business Company">
+        <a class="navbar-brand" href="<?= BASE_URL ?>">
+            <img src="<?= BASE_URL ?>logo.jpg" alt="Darou Salam Business Company">
             <div class="brand-text">
                 <span class="brand-name">Darou Salam</span>
                 <span class="brand-tagline">Business Company</span>
             </div>
+        </a>
+
+        <!-- Panier visible sur mobile à côté du toggler -->
+        <a href="<?= BASE_URL ?>?page=panier" class="nav-icon-btn d-lg-none" title="Panier" style="position:relative;margin-left:auto;margin-right:8px;" id="cart-icon-mobile">
+            <i class="bi bi-bag"></i>
+            <?php
+                $panierSessionMobile = $_SESSION['panier_darousalam'] ?? [];
+                $nbPanierMobile = array_sum(array_column((array)$panierSessionMobile, 'quantite'));
+            ?>
+            <span class="cart-badge" id="cart-count-mobile"><?= $nbPanierMobile > 0 ? $nbPanierMobile : '' ?></span>
         </a>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navCollapse">
@@ -261,15 +313,15 @@
 
         <div class="collapse navbar-collapse" id="navCollapse">
             <ul class="navbar-nav mx-auto gap-1">
-                <li class="nav-item"><a class="nav-link <?= (isset($activePage) && $activePage==='home') ? 'active':'' ?>" href="/darousalam/">Accueil</a></li>
-                <li class="nav-item"><a class="nav-link <?= (isset($activePage) && $activePage==='catalogue') ? 'active':'' ?>" href="/darousalam/catalogue">Catalogue</a></li>
-                <li class="nav-item"><a class="nav-link <?= (isset($activePage) && $activePage==='apropos') ? 'active':'' ?>" href="/darousalam/apropos">À propos</a></li>
-                <li class="nav-item"><a class="nav-link <?= (isset($activePage) && $activePage==='contact') ? 'active':'' ?>" href="/darousalam/contact">Contact</a></li>
+                <li class="nav-item"><a class="nav-link <?= (isset($activePage) && $activePage==='home') ? 'active':'' ?>" href="<?= BASE_URL ?>">Accueil</a></li>
+                <li class="nav-item"><a class="nav-link <?= (isset($activePage) && $activePage==='catalogue') ? 'active':'' ?>" href="<?= BASE_URL ?>?page=catalogue">Catalogue</a></li>
+                <li class="nav-item"><a class="nav-link <?= (isset($activePage) && $activePage==='apropos') ? 'active':'' ?>" href="<?= BASE_URL ?>?page=apropos">À propos</a></li>
+                <li class="nav-item"><a class="nav-link <?= (isset($activePage) && $activePage==='contact') ? 'active':'' ?>" href="<?= BASE_URL ?>?page=contact">Contact</a></li>
             </ul>
 
             <div class="d-flex align-items-center gap-3 mt-3 mt-lg-0">
                 <!-- Search -->
-                <form class="nav-search" action="/darousalam/catalogue" method="GET">
+                <form class="nav-search" action="catalogue" method="GET">
                     <input type="search" name="q" placeholder="Rechercher un fruit…" value="<?= htmlspecialchars($_GET['q'] ?? '') ?>">
                     <button type="submit" class="search-btn"><i class="bi bi-search"></i></button>
                 </form>
@@ -316,11 +368,11 @@
                 <?php endif; ?>
 
                 <!-- Cart -->
-                <a href="/darousalam/panier" class="nav-icon-btn" title="Panier" id="cart-icon">
+                <a href="panier" class="nav-icon-btn" title="Panier" id="cart-icon">
                     <i class="bi bi-bag"></i>
                     <?php
                         $panierSession = $_SESSION['panier_darousalam'] ?? [];
-                        $nbPanier = array_sum(array_column($panierSession, 'quantite'));
+                        $nbPanier = array_sum(array_column((array)$panierSession, 'quantite'));
                     ?>
                     <span class="cart-badge" id="cart-count"><?= $nbPanier > 0 ? $nbPanier : '' ?></span>
                 </a>
@@ -328,6 +380,62 @@
         </div>
     </div>
 </nav>
+
+<?php if (isLoggedIn() && (($_GET['page'] ?? 'accueil') === 'accueil')):
+    $__c = getClientSession();
+    $__prenom = htmlspecialchars($__c['prenom'] ?? $__c['nom'] ?? '');
+?>
+<div id="welcome-banner" style="background:linear-gradient(90deg,#0f2d16 0%,#1a5c2a 60%,#2d8a42 100%);color:#fff;padding:10px 0;border-bottom:2px solid #d4a017;position:fixed;top:0;left:0;right:0;z-index:1055;visibility:hidden;">
+  <div class="container d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-3">
+      <span style="width:36px;height:36px;border-radius:50%;background:#d4a017;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem;color:#0f2d16;flex-shrink:0;">
+        <?= strtoupper(substr($__prenom ?: 'U', 0, 1)) ?>
+      </span>
+      <div>
+        <div style="font-size:.88rem;font-weight:700;">Bienvenue, <?= $__prenom ?> 👋</div>
+        <div style="font-size:.75rem;color:rgba(255,255,255,.75);">Vous êtes dans votre espace — passez votre commande dès maintenant.</div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="<?= BASE_URL ?>?page=catalogue" style="background:#d4a017;color:#0f2d16;font-weight:700;font-size:.8rem;padding:7px 18px;border-radius:50px;text-decoration:none;white-space:nowrap;transition:background .2s;" onmouseover="this.style.background='#e6b800'" onmouseout="this.style.background='#d4a017'">
+        <i class="bi bi-bag-fill me-1"></i> Commander
+      </a>
+      <button id="welcome-close" style="background:none;border:none;color:rgba(255,255,255,.5);font-size:1.1rem;cursor:pointer;padding:0 4px;line-height:1;" title="Fermer">×</button>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+    function positionBanner() {
+        var banner = document.getElementById('welcome-banner');
+        var nav    = document.getElementById('main-nav');
+        var topBar = document.getElementById('top-bar');
+        if (!banner || !nav) return;
+        var navBottom = nav.getBoundingClientRect().bottom + window.scrollY;
+        // top fixe = hauteur topbar + hauteur navbar
+        var topBarH = topBar ? topBar.offsetHeight : 0;
+        var navH    = nav.offsetHeight;
+        var total   = topBarH + navH;
+        banner.style.top = total + 'px';
+        banner.style.visibility = 'visible';
+        // Ajuster padding-top du body
+        document.body.style.paddingTop = (total + banner.offsetHeight) + 'px';
+    }
+    document.addEventListener('DOMContentLoaded', positionBanner);
+    window.addEventListener('resize', positionBanner);
+    document.getElementById('welcome-close').addEventListener('click', function() {
+        var banner = document.getElementById('welcome-banner');
+        banner.style.display = 'none';
+        // Restaurer le padding-top sans la bannière
+        var nav    = document.getElementById('main-nav');
+        var topBar = document.getElementById('top-bar');
+        var topBarH = topBar ? topBar.offsetHeight : 0;
+        var navH    = nav ? nav.offsetHeight : 0;
+        document.body.style.paddingTop = (topBarH + navH) + 'px';
+    });
+})();
+</script>
+<?php endif; ?>
 
 <?php
 $_promosActives = [];
@@ -402,7 +510,7 @@ if (!empty($_promosActives)): ?>
                         title="Cliquer pour copier"><?= htmlspecialchars($_promo['code']) ?></span>
                     <?php if (!empty($_promo['date_fin'])): ?>
                     <span style="font-size:.78rem;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:3px 11px;font-weight:600;letter-spacing:.2px;">
-                        <i class="bi bi-clock-fill me-1"></i>Expire le <?= date('d/m/Y', strtotime($_promo['date_fin'])) ?>
+                        <i class="bi bi-clock-fill me-1"></i>Expire le <?= date('d/m/Y', strtotime((string)$_promo['date_fin'])) ?>
                     </span>
                     <?php endif; ?>
                 </div>
@@ -472,7 +580,7 @@ function addToCart(id, name, price, img) {
     // Soumettre via formulaire POST pour synchroniser avec la session PHP
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = '/darousalam/?page=panier_ajouter';
+    form.action = '?page=panier_ajouter';
     const inp = document.createElement('input');
     inp.type = 'hidden'; inp.name = 'produit_id'; inp.value = id;
     const qty = document.createElement('input');
@@ -481,4 +589,215 @@ function addToCart(id, name, price, img) {
     document.body.appendChild(form);
     form.submit();
 }
+
+/* Son "pop" panier via Web Audio API — contexte unique réutilisé */
+(function() {
+    var _ctx = null;
+    function getCtx() {
+        if (!_ctx) _ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (_ctx.state === 'suspended') _ctx.resume();
+        return _ctx;
+    }
+    window.playCartSound = function() {
+        try {
+            var ctx = getCtx();
+            var t = ctx.currentTime;
+            var o1 = ctx.createOscillator(), g1 = ctx.createGain();
+            o1.connect(g1); g1.connect(ctx.destination);
+            o1.type = 'sine';
+            o1.frequency.setValueAtTime(520, t);
+            o1.frequency.exponentialRampToValueAtTime(680, t + 0.08);
+            g1.gain.setValueAtTime(0.18, t);
+            g1.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+            o1.start(t); o1.stop(t + 0.18);
+            var o2 = ctx.createOscillator(), g2 = ctx.createGain();
+            o2.connect(g2); g2.connect(ctx.destination);
+            o2.type = 'sine';
+            o2.frequency.setValueAtTime(880, t + 0.07);
+            o2.frequency.exponentialRampToValueAtTime(1100, t + 0.18);
+            g2.gain.setValueAtTime(0.10, t + 0.07);
+            g2.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+            o2.start(t + 0.07); o2.stop(t + 0.32);
+        } catch(e) {}
+    };
+})();
+
+/* Synchronisation badge panier desktop ↔ mobile */
+(function() {
+    var desktopBadge = document.getElementById('cart-count');
+    var mobileBadge  = document.getElementById('cart-count-mobile');
+    if (!desktopBadge || !mobileBadge) return;
+    var obs = new MutationObserver(function() {
+        mobileBadge.textContent = desktopBadge.textContent;
+        mobileBadge.style.animation = 'none';
+        void mobileBadge.offsetWidth;
+        mobileBadge.style.animation = desktopBadge.style.animation;
+    });
+    obs.observe(desktopBadge, { childList: true, characterData: true, subtree: true });
+})();
 </script>
+
+<?php if (!isset($_SESSION['client_id'])): ?>
+<!-- ===== POPUP CODE PROMO BIENVENUE ===== -->
+<style>
+#dsbc-promo-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0,0,0,.62);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    align-items: center;
+    justify-content: center;
+}
+#dsbc-promo-overlay.show { display: flex; animation: dsbcFadeIn .3s ease forwards; }
+@keyframes dsbcFadeIn { from { opacity:0; } to { opacity:1; } }
+#dsbc-promo-modal {
+    background: #fff;
+    border: 2px solid #1a5c2a;
+    border-radius: 20px;
+    max-width: 480px;
+    width: calc(100% - 32px);
+    box-shadow: 0 24px 64px rgba(0,0,0,.32);
+    overflow: hidden;
+    transform: scale(.8);
+    opacity: 0;
+    animation: dsbcModalIn .3s ease .08s forwards;
+}
+@keyframes dsbcModalIn { from { transform:scale(.8);opacity:0; } to { transform:scale(1);opacity:1; } }
+#dsbc-promo-header {
+    background: linear-gradient(135deg,#0f2d16 0%,#1a5c2a 60%,#2d8a42 100%);
+    color: #fff;
+    padding: 22px 24px 18px;
+    position: relative;
+    text-align: center;
+}
+#dsbc-promo-close {
+    position: absolute; top: 12px; right: 14px;
+    background: rgba(255,255,255,.12); border: none; color: rgba(255,255,255,.8);
+    font-size: 1.3rem; width: 30px; height: 30px; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    line-height: 1; transition: background .2s;
+}
+#dsbc-promo-close:hover { background: rgba(255,255,255,.28); color: #fff; }
+.dsbc-badge-discount {
+    display: inline-block;
+    background: #d4a017; color: #0f2d16;
+    font-size: 2.8rem; font-weight: 900;
+    font-family: 'Playfair Display', Georgia, serif;
+    border-radius: 16px; padding: 8px 28px; margin: 12px 0 6px;
+    box-shadow: 0 4px 18px rgba(212,160,23,.45); letter-spacing: 1px;
+}
+#dsbc-promo-body { padding: 22px 28px 26px; text-align: center; }
+.dsbc-code-wrap {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; margin: 16px 0;
+}
+.dsbc-code-box {
+    background: #f4f4f0; border: 2px dashed #1a5c2a; border-radius: 10px;
+    font-family: monospace; font-size: 1.35rem; font-weight: 800;
+    letter-spacing: 4px; color: #1a5c2a; padding: 10px 20px;
+}
+.dsbc-btn-copy {
+    background: #1a5c2a; color: #fff; border: none; border-radius: 8px;
+    padding: 10px 16px; font-size: .82rem; font-weight: 700; cursor: pointer;
+    font-family: inherit; transition: background .2s; white-space: nowrap;
+}
+.dsbc-btn-copy:hover { background: #236b34; }
+.dsbc-btn-use {
+    display: block; width: 100%; background: #d4a017; color: #0f2d16;
+    border: none; border-radius: 50px; padding: 13px 0;
+    font-size: 1rem; font-weight: 800; cursor: pointer; font-family: inherit;
+    letter-spacing: .5px; text-decoration: none;
+    transition: background .2s, transform .15s; margin-top: 16px;
+    text-align: center;
+}
+.dsbc-btn-use:hover { background: #e6b800; transform: scale(1.02); color: #0f2d16; }
+.dsbc-validity { font-size: .78rem; color: #6b7280; margin-top: 12px; }
+</style>
+
+<div id="dsbc-promo-overlay" role="dialog" aria-modal="true" aria-label="Offre de bienvenue">
+    <div id="dsbc-promo-modal">
+        <div id="dsbc-promo-header">
+            <button id="dsbc-promo-close" aria-label="Fermer">&times;</button>
+            <i class="bi bi-gift-fill" style="font-size:1.8rem;color:#d4a017;"></i>
+            <div style="font-family:'Playfair Display',Georgia,serif;font-size:1.3rem;font-weight:700;margin-top:6px;">Offre de bienvenue</div>
+            <div class="dsbc-badge-discount">-10%</div>
+            <div style="font-size:.85rem;color:rgba(255,255,255,.82);">Sur votre premi&egrave;re commande</div>
+        </div>
+        <div id="dsbc-promo-body">
+            <div style="font-size:.95rem;color:#374151;font-weight:600;">Utilisez ce code &agrave; la commande&nbsp;:</div>
+            <div class="dsbc-code-wrap">
+                <div class="dsbc-code-box" id="dsbc-code-text">BIENVENUE10</div>
+                <button class="dsbc-btn-copy" id="dsbc-copy-btn">
+                    <i class="bi bi-clipboard me-1"></i>Copier
+                </button>
+            </div>
+            <a href="<?= BASE_URL ?>?page=catalogue" class="dsbc-btn-use">
+                <i class="bi bi-bag-fill me-1"></i> Utiliser maintenant
+            </a>
+            <div class="dsbc-validity"><i class="bi bi-clock me-1"></i>Valable 7 jours &mdash; offre r&eacute;serv&eacute;e aux nouveaux visiteurs</div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function getCookie(name) {
+        var v = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+        return v ? decodeURIComponent(v[1]) : null;
+    }
+    function setCookie(name, value, days) {
+        var d = new Date();
+        d.setTime(d.getTime() + days * 864e5);
+        document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+    }
+    function closePopup() {
+        var overlay = document.getElementById('dsbc-promo-overlay');
+        if (!overlay) return;
+        overlay.style.transition = 'opacity .25s';
+        overlay.style.opacity = '0';
+        setTimeout(function() { overlay.style.display = 'none'; overlay.style.opacity = ''; }, 260);
+    }
+    function copyCode() {
+        var btn = document.getElementById('dsbc-copy-btn');
+        var fallback = function() {
+            var el = document.getElementById('dsbc-code-text');
+            var range = document.createRange();
+            range.selectNodeContents(el);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            document.execCommand('copy');
+            sel.removeAllRanges();
+            btn.textContent = 'Copié ✓';
+            setTimeout(function() { btn.textContent = 'Copier'; }, 2000);
+        };
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText('BIENVENUE10').then(function() {
+                btn.textContent = 'Copié ✓';
+                btn.style.background = '#2d8a42';
+                setTimeout(function() { btn.textContent = 'Copier'; btn.style.background = ''; }, 2000);
+            }).catch(fallback);
+        } else { fallback(); }
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!getCookie('dsbc_first_visit')) {
+            var overlay = document.getElementById('dsbc-promo-overlay');
+            if (overlay) {
+                setCookie('dsbc_first_visit', '1', 30);
+                overlay.classList.add('show');
+            }
+        }
+        var cl = document.getElementById('dsbc-promo-close');
+        if (cl) cl.addEventListener('click', closePopup);
+        var ov = document.getElementById('dsbc-promo-overlay');
+        if (ov) ov.addEventListener('click', function(e) { if (e.target === ov) closePopup(); });
+        var cp = document.getElementById('dsbc-copy-btn');
+        if (cp) cp.addEventListener('click', copyCode);
+    });
+})();
+</script>
+<?php endif; ?>
+<!-- ===== FIN POPUP CODE PROMO ===== -->
