@@ -114,7 +114,7 @@ function adresseLivraison(mixed $json): string {
           </td>
           <td>
             <!-- Assign livreur inline -->
-            <form method="POST" action="<?= BASE_URL ?>?page=admin_livraison_assigner" style="display:inline;">
+            <form method="POST" action="<?= BASE_URL ?>?page=adm_ship_asgn" style="display:inline;">
               <input type="hidden" name="livraison_id" value="<?= $liv['id'] ?>">
               <select name="livreur_id" class="liv-select" onchange="this.form.submit()" title="Assigner un livreur">
                 <option value="0" <?= !$liv['livreur_id'] ? 'selected' : '' ?>>— Choisir —</option>
@@ -128,7 +128,7 @@ function adresseLivraison(mixed $json): string {
           </td>
           <td>
             <!-- Changer statut inline -->
-            <form method="POST" action="<?= BASE_URL ?>?page=admin_livraison_statut" style="display:inline;">
+            <form method="POST" action="<?= BASE_URL ?>?page=adm_ship_sta" style="display:inline;">
               <input type="hidden" name="livraison_id" value="<?= $liv['id'] ?>">
               <select name="statut" class="liv-select" onchange="this.form.submit()"
                       style="<?= match($liv['statut']) {
@@ -155,11 +155,20 @@ function adresseLivraison(mixed $json): string {
               </div>
             <?php endif; ?>
           </td>
-          <td>
-            <a href="<?= BASE_URL ?>?page=admin_commande_detail&id=<?= $liv['commande_id'] ?>"
+          <td style="white-space:nowrap;">
+            <a href="<?= BASE_URL ?>?page=adm_cmd_det&id=<?= $liv['commande_id'] ?>"
                class="btn-sm-action btn-view" title="Voir la commande">
               <i class="bi bi-eye"></i>
             </a>
+            <?php if (in_array($liv['statut'], ['assignee','en_cours'])): ?>
+            <button type="button"
+                    class="btn-sm-action"
+                    style="background:#ede9fe;color:#6d28d9;border:1.5px solid #ddd6fe;margin-left:4px;"
+                    title="Mettre a jour position GPS"
+                    onclick="ouvrirModalGPS(<?= $liv['id'] ?>, '<?= htmlspecialchars($liv['reference'] ?? 'LIV-'.$liv['id'], ENT_QUOTES) ?>')">
+              <i class="bi bi-geo-alt-fill"></i>
+            </button>
+            <?php endif; ?>
           </td>
         </tr>
         <?php endforeach; endif; ?>
@@ -172,17 +181,157 @@ function adresseLivraison(mixed $json): string {
 <div class="a-card">
   <div class="a-card-head">
     <div class="a-card-title"><i class="bi bi-people" style="color:var(--vert);"></i> Livreurs</div>
-    <a href="<?= BASE_URL ?>?page=admin_livreurs" class="topbar-btn primary">
+    <a href="<?= BASE_URL ?>?page=adm_drv" class="topbar-btn primary">
       <i class="bi bi-arrow-right-circle"></i> Gérer les livreurs
     </a>
   </div>
   <div style="padding:20px 22px;display:flex;align-items:center;gap:16px;color:#6b7280;font-size:.85rem;">
     <i class="bi bi-info-circle" style="font-size:1.2rem;color:#2563eb;flex-shrink:0;"></i>
     La gestion des livreurs (ajout, modification, statistiques) a été déplacée dans une page dédiée.
-    <a href="<?= BASE_URL ?>?page=admin_livreurs" style="margin-left:auto;padding:8px 16px;background:var(--vert);color:#fff;border-radius:8px;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap;">
+    <a href="<?= BASE_URL ?>?page=adm_drv" style="margin-left:auto;padding:8px 16px;background:var(--vert);color:#fff;border-radius:8px;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap;">
       <i class="bi bi-arrow-right-circle"></i> Voir les livreurs
     </a>
   </div>
 </div>
+
+<!-- ===== MODAL GPS POSITION ===== -->
+<div id="modalGPS" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:20px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#4c1d95,#6d28d9);padding:20px 24px;display:flex;align-items:center;gap:12px;">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#fff;flex-shrink:0;">
+        <i class="bi bi-geo-alt-fill"></i>
+      </div>
+      <div>
+        <div style="font-size:1rem;font-weight:800;color:#fff;">Position GPS du livreur</div>
+        <div id="gps-livraison-ref" style="font-size:.75rem;color:rgba(255,255,255,.7);"></div>
+      </div>
+      <button type="button" onclick="fermerModalGPS()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1.1rem;">&#x2715;</button>
+    </div>
+    <div style="padding:24px;">
+      <div style="margin-bottom:14px;">
+        <button type="button" id="btn-gps-auto"
+                onclick="utiliserMaPosition()"
+                style="width:100%;padding:11px;background:#f0fdf4;color:#15803d;border:1.5px solid #bbf7d0;border-radius:11px;font-size:.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <i class="bi bi-crosshair"></i> Utiliser ma position actuelle
+        </button>
+        <div id="gps-auto-status" style="font-size:.75rem;color:#6b7280;margin-top:6px;text-align:center;min-height:1em;"></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:#9ca3af;font-size:.78rem;">
+        <div style="flex:1;height:1px;background:#e5e7eb;"></div>ou saisir manuellement<div style="flex:1;height:1px;background:#e5e7eb;"></div>
+      </div>
+
+      <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;">Latitude</label>
+      <input id="gps-lat" type="number" step="0.0000001" placeholder="ex: 14.6937"
+             style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:.88rem;margin-bottom:12px;outline:none;box-sizing:border-box;">
+
+      <label style="display:block;font-size:.78rem;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;">Longitude</label>
+      <input id="gps-lng" type="number" step="0.0000001" placeholder="ex: -17.4441"
+             style="width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:.88rem;margin-bottom:16px;outline:none;box-sizing:border-box;">
+
+      <div id="gps-error" style="display:none;font-size:.78rem;color:#dc2626;margin-bottom:12px;background:#fff1f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;"></div>
+
+      <button type="button" onclick="sauvegarderPosition()"
+              style="width:100%;padding:12px;background:#6d28d9;color:#fff;border:none;border-radius:11px;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(109,40,217,.3);">
+        <i class="bi bi-save2-fill"></i> Enregistrer la position
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _gpsLivraisonId = 0;
+var _gpsToken       = '<?= htmlspecialchars($_SESSION['csrf_admin'] ?? '', ENT_QUOTES) ?>';
+
+function ouvrirModalGPS(id, ref) {
+    _gpsLivraisonId = id;
+    document.getElementById('gps-livraison-ref').textContent = ref;
+    document.getElementById('gps-lat').value = '';
+    document.getElementById('gps-lng').value = '';
+    document.getElementById('gps-error').style.display = 'none';
+    document.getElementById('gps-auto-status').textContent = '';
+    document.getElementById('modalGPS').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function fermerModalGPS() {
+    document.getElementById('modalGPS').style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function utiliserMaPosition() {
+    var statusEl = document.getElementById('gps-auto-status');
+    var btn      = document.getElementById('btn-gps-auto');
+    if (!navigator.geolocation) {
+        statusEl.textContent = 'La geolocalisation n\'est pas disponible sur ce navigateur.';
+        return;
+    }
+    btn.disabled    = true;
+    statusEl.textContent = 'Localisation en cours...';
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            document.getElementById('gps-lat').value = pos.coords.latitude.toFixed(7);
+            document.getElementById('gps-lng').value = pos.coords.longitude.toFixed(7);
+            statusEl.textContent = 'Position obtenue.';
+            btn.disabled = false;
+        },
+        function(err) {
+            statusEl.textContent = 'Erreur : ' + err.message;
+            btn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+function sauvegarderPosition() {
+    var lat = parseFloat(document.getElementById('gps-lat').value);
+    var lng = parseFloat(document.getElementById('gps-lng').value);
+    var errEl = document.getElementById('gps-error');
+
+    if (isNaN(lat) || isNaN(lng)) {
+        errEl.textContent = 'Veuillez renseigner une latitude et une longitude valides.';
+        errEl.style.display = 'block';
+        return;
+    }
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        errEl.textContent = 'Coordonnees hors limites (lat: -90..90, lng: -180..180).';
+        errEl.style.display = 'block';
+        return;
+    }
+    errEl.style.display = 'none';
+
+    var body = new URLSearchParams();
+    body.append('livraison_id', _gpsLivraisonId);
+    body.append('lat',          lat);
+    body.append('lng',          lng);
+    body.append('csrf_token',   _gpsToken);
+
+    fetch('<?= BASE_URL ?>?page=adm_upd_pos', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body.toString()
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (d.success) {
+            // Mettre a jour le token depuis la reponse si disponible
+            fermerModalGPS();
+            // Rafraichir la page pour afficher la position mise a jour
+            window.location.reload();
+        } else {
+            errEl.textContent = d.error || 'Erreur lors de l\'enregistrement.';
+            errEl.style.display = 'block';
+        }
+    })
+    .catch(function(){
+        errEl.textContent = 'Erreur reseau. Veuillez reessayer.';
+        errEl.style.display = 'block';
+    });
+}
+
+document.getElementById('modalGPS').addEventListener('click', function(e) {
+    if (e.target === this) fermerModalGPS();
+});
+</script>
 
 <?php require_once __DIR__ . '/layout_end.php'; ?>

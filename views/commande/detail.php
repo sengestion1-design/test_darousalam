@@ -374,6 +374,78 @@ $idxActuel = array_search($statutActuel === 'annulee' ? 'en_attente' : $statutAc
                 </div>
                 <?php endif; ?>
 
+                <!-- CARTE LEAFLET suivi temps reel -->
+                <?php if ($statutActuel === 'en_livraison' && !empty($livraison)): ?>
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+                <div style="margin-top:16px;">
+                    <div style="font-size:.7rem;font-weight:700;color:#6d28d9;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                        <i class="bi bi-geo-alt-fill"></i> Position en temps reel
+                    </div>
+                    <div id="ds-livreur-map" style="height:400px;border-radius:12px;border:1.5px solid #e5e7eb;overflow:hidden;background:#f3f4f6;"></div>
+                    <div id="ds-pos-info" style="margin-top:8px;font-size:.75rem;color:#6b7280;text-align:center;min-height:1.2em;"></div>
+                </div>
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPvE=" crossorigin=""></script>
+                <script>
+                (function(){
+                    var LIVRAISON_ID = <?= (int)$livraison['id'] ?>;
+                    var BASE         = '<?= BASE_URL ?>';
+                    var adrClient    = <?= json_encode(trim(($adr['adresse'] ?? '') . ' ' . ($adr['ville'] ?? 'Dakar'))) ?>;
+                    var map = L.map('ds-livreur-map', { zoomControl: true }).setView([14.6937, -17.4441], 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: 'OpenStreetMap contributors', maxZoom: 19
+                    }).addTo(map);
+                    var truckIcon = L.divIcon({
+                        html: '<span style="font-size:28px;line-height:1;">🚚</span>',
+                        className: '', iconSize: [36,36], iconAnchor: [18,18], popupAnchor: [0,-20]
+                    });
+                    var destIcon = L.divIcon({
+                        html: '<span style="font-size:28px;line-height:1;">🏠</span>',
+                        className: '', iconSize: [32,32], iconAnchor: [16,32], popupAnchor: [0,-34]
+                    });
+                    var livreurMarker = null, destMarker = null;
+                    var infoEl = document.getElementById('ds-pos-info');
+                    function setInfo(msg) { infoEl.textContent = msg; }
+                    function fetchPosition() {
+                        fetch(BASE + '?page=adm_live_pos&livraison_id=' + LIVRAISON_ID)
+                            .then(function(r){ return r.json(); })
+                            .then(function(d){
+                                if (d.error) { setInfo('Position non disponible pour le moment.'); return; }
+                                var stale = true, diff = null;
+                                if (d.updated_at) {
+                                    var ms = new Date() - new Date(d.updated_at.replace(' ','T'));
+                                    stale  = ms > 7200000;
+                                    diff   = Math.floor(ms / 60000);
+                                }
+                                if (stale || d.lat === null) {
+                                    setInfo('Position non disponible pour le moment.');
+                                } else {
+                                    setInfo(diff <= 1
+                                        ? 'Votre livreur est en route — position mise a jour a l\'instant'
+                                        : 'Votre livreur est en route — position mise a jour il y a ' + diff + ' min');
+                                }
+                                if (d.lat !== null && d.lng !== null && !stale) {
+                                    if (!livreurMarker) {
+                                        livreurMarker = L.marker([d.lat, d.lng], {icon: truckIcon})
+                                            .addTo(map).bindPopup('Votre livreur');
+                                        map.setView([d.lat, d.lng], 15);
+                                        if (adrClient && !destMarker) {
+                                            destMarker = L.marker([d.lat - 0.004, d.lng + 0.004], {icon: destIcon})
+                                                .addTo(map).bindPopup('Destination : ' + adrClient);
+                                        }
+                                    } else {
+                                        livreurMarker.setLatLng([d.lat, d.lng]);
+                                    }
+                                }
+                                if (d.statut === 'livree' || d.statut === 'echouee') clearInterval(pollTimer);
+                            })
+                            .catch(function(){ setInfo('Position non disponible pour le moment.'); });
+                    }
+                    fetchPosition();
+                    var pollTimer = setInterval(fetchPosition, 30000);
+                })();
+                </script>
+                <?php endif; ?>
+
                 <!-- Livreur -->
                 <?php if (!empty($livraison) && !empty($livraison['livreur_nom'])): ?>
                 <div style="margin-top:16px;padding:13px 15px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;">

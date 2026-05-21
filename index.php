@@ -7,9 +7,9 @@ header('X-Frame-Options: SAMEORIGIN');
 header('X-Content-Type-Options: nosniff');
 header('X-XSS-Protection: 1; mode=block');
 header('Referrer-Policy: strict-origin-when-cross-origin');
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: https:; frame-src https://www.google.com https://www.google.com/maps/; connect-src 'self';");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://unpkg.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://unpkg.com; img-src 'self' data: https: https://*.tile.openstreetmap.org; frame-src https://www.google.com https://www.google.com/maps/; connect-src 'self' https://*.tile.openstreetmap.org;");
 header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
-header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=()');
 
 // --- Session sécurisée ---
 ini_set('session.cookie_httponly', '1');
@@ -169,6 +169,8 @@ $routes = [
     'adm_ship_asgn'   => ['AdminController', 'assignerLivreur'],
     'adm_ship_sta'    => ['AdminController', 'changerStatutLivraison'],
     'adm_pdf'         => ['AdminController', 'telechargerFacture'],
+    'adm_live_pos'    => ['AdminController', 'getPositionLivreur'],
+    'adm_upd_pos'     => ['AdminController', 'updatePositionLivreur'],
     // anciens noms conservés
     'admin_commandes'         => ['AdminController', 'commandes'],
     'admin_check_commandes'   => ['AdminController', 'checkNouvellesCommandes'],
@@ -217,6 +219,14 @@ $routes = [
     'admin_livraison_assigner'      => ['AdminController', 'assignerLivreur'],
     'admin_livraison_statut'        => ['AdminController', 'changerStatutLivraison'],
     'admin_facture_pdf'             => ['AdminController', 'telechargerFacture'],
+
+    // Avis clients
+    'avis'              => ['AvisController', 'index'],
+    'avis_soumettre'    => ['AvisController', 'soumettre'],
+    'adm_avis'          => ['AdminController', 'avis'],
+    'adm_avis_ok'       => ['AdminController', 'approuverAvis'],
+    'adm_avis_ko'       => ['AdminController', 'rejeterAvis'],
+    'adm_avis_del'      => ['AdminController', 'supprimerAvis'],
 
     // Newsletter
     'newsletter_subscribe'  => ['NewsletterController', 'subscribe'],

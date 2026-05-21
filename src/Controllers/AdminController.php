@@ -2078,6 +2078,78 @@ class AdminController
     }
 
     // ---------------------------------------------------------------
+    // AVIS CLIENTS
+    // ---------------------------------------------------------------
+
+    public function avis(): void
+    {
+        $this->requireAdmin();
+        $db     = $this->getDb();
+        $filtre = $_GET['statut'] ?? '';
+
+        $where  = '1=1';
+        $params = [];
+        if (in_array($filtre, ['en_attente', 'approuve', 'rejete'], true)) {
+            $where  = 'statut = :statut';
+            $params = [':statut' => $filtre];
+        }
+
+        $avis = $db->fetchAll(
+            "SELECT * FROM avis WHERE $where ORDER BY created_at DESC",
+            $params
+        ) ?: [];
+
+        $pageTitle = 'Avis clients';
+        $adminPage = 'avis';
+        require_once __DIR__ . '/../../views/admin/avis.php';
+    }
+
+    public function approuverAvis(): void
+    {
+        $this->requireAdmin();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_avis'); return; }
+        $this->verifyCsrfAdmin();
+
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { redirect('adm_avis'); return; }
+
+        $this->getDb()->query(
+            "UPDATE avis SET statut = 'approuve' WHERE id = :id",
+            [':id' => $id]
+        );
+        redirect('adm_avis&success=' . urlencode('Avis approuvé avec succès.'));
+    }
+
+    public function rejeterAvis(): void
+    {
+        $this->requireAdmin();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_avis'); return; }
+        $this->verifyCsrfAdmin();
+
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { redirect('adm_avis'); return; }
+
+        $this->getDb()->query(
+            "UPDATE avis SET statut = 'rejete' WHERE id = :id",
+            [':id' => $id]
+        );
+        redirect('adm_avis&success=' . urlencode('Avis rejeté.'));
+    }
+
+    public function supprimerAvis(): void
+    {
+        $this->requireAdmin();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('adm_avis'); return; }
+        $this->verifyCsrfAdmin();
+
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$id) { redirect('adm_avis'); return; }
+
+        $this->getDb()->query("DELETE FROM avis WHERE id = :id", [':id' => $id]);
+        redirect('adm_avis&success=' . urlencode('Avis supprimé.'));
+    }
+
+    // ---------------------------------------------------------------
     // SUIVI GPS LIVREUR EN TEMPS RÉEL
     // ---------------------------------------------------------------
 
