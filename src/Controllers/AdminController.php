@@ -350,6 +350,27 @@ class AdminController
             }
         }
 
+        // Crediter les points de fidelite quand commande passe a livree
+        if ($ancienStatut !== 'livree' && $statut === 'livree') {
+            $points = (int)floor(($commande['total'] ?? 0) / 1000);
+            if ($points > 0) {
+                $db->query(
+                    "UPDATE clients SET points_fidelite = points_fidelite + :p WHERE id = :id",
+                    [':p' => $points, ':id' => $commande['client_id']]
+                );
+                $db->query(
+                    "INSERT INTO fidelite_historique (client_id, commande_id, points, type, description)
+                     VALUES (:cid, :cmd, :p, 'credit', :desc)",
+                    [
+                        ':cid'  => $commande['client_id'],
+                        ':cmd'  => $id,
+                        ':p'    => $points,
+                        ':desc' => 'Commande ' . ($commande['reference'] ?? '#'.$id) . ' livree',
+                    ]
+                );
+            }
+        }
+
         // Synchroniser le statut de livraison quand commande livrée ou annulée
         if ($ancienStatut !== $statut && in_array($statut, ['livree', 'annulee'])) {
             $statutLivraison = ($statut === 'livree') ? 'livree' : 'echouee';
@@ -2054,5 +2075,107 @@ class AdminController
         $db->query("DELETE FROM promotions WHERE id = :id", [':id' => $id]);
 
         redirect('admin_promotions&success=' . urlencode('Code promo "' . $promo['code'] . '" supprimé.'));
+    }
+
+    // ---------------------------------------------------------------
+    // SUIVI GPS LIVREUR EN TEMPS RÉEL
+    // ---------------------------------------------------------------
+
+    /**
+     * GET ?page=adm_live_pos&livraison_id=X
+     * Retourne JSON {lat, lng, updated_at, statut}
+     */
+    public function getPositionLivreur(): void
+    {
+        $this->requireAdmin();
+        header('Content-Type: application/json; charset=utf-8');
+
+        $id = (int)($_GET['livraison_id'] ?? 0);
+        if (!$id) {
+            echo json_encode(['error' => 'livraison_id manquant']);
+            exit;
+        }
+
+        $db  = $this->getDb();
+        $row = $db->fetch(
+            "SELECT livreur_lat, livreur_lng, position_updated_at, statut
+             FROM livraisons WHERE id = :id",
+            [':id' => $id]
+        );
+
+        if (!$row) {
+            echo json_encode(['error' => 'Livraison introuvable']);
+            exit;
+        }
+
+        echo json_encode([
+            'lat'        => $row['livreur_lat']         !== null ? (float)$row['livreur_lat'] : null,
+            'lng'        => $row['livreur_lng']         !== null ? (float)$row['livreur_lng'] : null,
+            'updated_at' => $row['position_updated_at'] ?? null,
+            'statut'     => $row['statut'],
+        ]);
+        exit;
+    }
+
+    /**
+     * POST ?page=adm_upd_pos
+     * Body : livraison_id, lat, lng  (+ csrf_token)
+     * Met à jour la position GPS du livreur
+     */
+    public function updatePositionLivreur(): void
+    {
+        $this->requireAdmin();
+        header('Content-Type: application/json; charset=utf-8');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Méthode non autorisée']);
+            exit;
+        }
+
+        // Vérification CSRF (token dans le body ou dans le header HTTP)
+        $token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        if (empty($token) || $token !== ($_SESSION['csrf_admin'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Token CSRF invalide']);
+            exit;
+        }
+        // Régénérer le token
+        $_SESSION['csrf_admin'] = bin2hex(random_bytes(32));
+
+        $id  = (int)($_POST['livraison_id'] ?? 0);
+        $lat = isset($_POST['lat']) ? (float)$_POST['lat'] : null;
+        $lng = isset($_POST['lng']) ? (float)$_POST['lng'] : null;
+
+        if (!$id || $lat === null || $lng === null) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Paramètres manquants (livraison_id, lat, lng)']);
+            exit;
+        }
+
+        // Validation basique des coordonnées
+        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Coordonnées GPS invalides']);
+            exit;
+        }
+
+        $db     = $this->getDb();
+        $exists = $db->fetch("SELECT id FROM livraisons WHERE id = :id", [':id' => $id]);
+        if (!$exists) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Livraison introuvable']);
+            exit;
+        }
+
+        $db->query(
+            "UPDATE livraisons
+             SET livreur_lat = :lat, livreur_lng = :lng, position_updated_at = NOW()
+             WHERE id = :id",
+            [':lat' => $lat, ':lng' => $lng, ':id' => $id]
+        );
+
+        echo json_encode(['success' => true, 'lat' => $lat, 'lng' => $lng, 'updated_at' => date('Y-m-d H:i:s')]);
+        exit;
     }
 }

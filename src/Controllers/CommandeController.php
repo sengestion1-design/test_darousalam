@@ -85,6 +85,7 @@ class CommandeController
                 $zone = $db->fetch("SELECT * FROM zones_livraison WHERE id = :id AND actif = 1", [':id' => $zoneId]);
             }
 
+            $utiliserPoints = !empty($_POST['utiliser_points']);
             $adresse = [
                 'adresse'   => trim($_POST['adresse'] ?? ''),
                 'ville'     => $zone ? $zone['nom'] : trim($_POST['ville'] ?? ''),
@@ -121,6 +122,20 @@ class CommandeController
                         }
                     }
 
+                    // Remise points de fidelite
+                    $remisePoints = 0;
+                    $pointsUtilises = 0;
+                    if ($utiliserPoints) {
+                        $rowClient = $db->fetch("SELECT points_fidelite FROM clients WHERE id = :id", [':id' => $_SESSION['client_id']]);
+                        $ptsDispo = (int)($rowClient['points_fidelite'] ?? 0);
+                        if ($ptsDispo >= 100) {
+                            $remisePoints = (int)floor($ptsDispo / 100) * 1000;
+                            $remisePoints = min($remisePoints, $sousTotal - $remise); // ne pas dépasser le sous-total
+                            $pointsUtilises = (int)($remisePoints / 1000) * 100;
+                        }
+                    }
+                    $remise += $remisePoints;
+
                     // Calculer frais de livraison
                     $apresRemise = $sousTotal - $remise;
                     $fraisLivraison = (float)($zone['frais'] ?? 0);
@@ -137,6 +152,24 @@ class CommandeController
                     );
 
                     if ($commandeId) {
+                        // Deduire les points de fidelite utilises
+                        if ($utiliserPoints && $pointsUtilises > 0) {
+                            $db->query(
+                                "UPDATE clients SET points_fidelite = GREATEST(0, points_fidelite - :p) WHERE id = :id",
+                                [':p' => $pointsUtilises, ':id' => $_SESSION['client_id']]
+                            );
+                            $db->query(
+                                "INSERT INTO fidelite_historique (client_id, commande_id, points, type, description)
+                                 VALUES (:cid, :cmd, :p, 'debit', :desc)",
+                                [
+                                    ':cid'  => $_SESSION['client_id'],
+                                    ':cmd'  => $commandeId,
+                                    ':p'    => $pointsUtilises,
+                                    ':desc' => 'Remise fidelite utilisee (−' . number_format($remisePoints, 0, ',', ' ') . ' FCFA)',
+                                ]
+                            );
+                        }
+
                         $this->panier->vider();
 
                         // Emails post-commande

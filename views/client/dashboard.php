@@ -15,6 +15,19 @@ $created      = isset($cl['created_at']) ? date('M Y', strtotime($cl['created_at
 $commandes = $dernieresCommandes ?? [];
 $totalCmds = $totalCommandes ?? 0;
 
+// Points de fidelite
+$pointsFidelite = (int)($cl['points_fidelite'] ?? 0);
+$equivalentFCFA = (int)floor($pointsFidelite / 100) * 1000;
+try {
+    $_dbDash = Database::getInstance();
+    $historiquePoints = $_dbDash->fetchAll(
+        "SELECT * FROM fidelite_historique WHERE client_id = :id ORDER BY created_at DESC LIMIT 5",
+        [':id' => $cl['id'] ?? 0]
+    );
+} catch (Exception $e) {
+    $historiquePoints = [];
+}
+
 // Stats
 $totalDepense = 0;
 $enCours = 0;
@@ -333,6 +346,32 @@ body { font-family:var(--font); background:#f5f5f0; color:#1c1917; overflow-x:hi
 @keyframes flashIn  { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:translateX(0)} }
 @keyframes flashOut { to{opacity:0;transform:translateX(30px)} }
 
+/* Fidelite */
+.fid-badge {
+  display:inline-flex; align-items:center; gap:8px;
+  background:linear-gradient(135deg,#d4a017,#b8860b);
+  color:#fff; border-radius:50px;
+  padding:6px 18px; font-size:.85rem; font-weight:800;
+  box-shadow:0 4px 14px rgba(212,160,23,.35);
+  letter-spacing:.02em;
+}
+.fid-badge i { font-size:1rem; }
+.fid-equiv {
+  font-size:.78rem; color:#92400e; font-weight:600;
+  background:#fffbeb; border:1px solid #fde68a;
+  border-radius:8px; padding:4px 12px;
+  display:inline-flex; align-items:center; gap:5px; margin-top:8px;
+}
+.fid-hist-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 16px; border-bottom:1px solid #f9fafb; font-size:.82rem;
+}
+.fid-hist-row:last-child { border-bottom:none; }
+.fid-hist-desc { color:#374151; font-weight:500; }
+.fid-hist-date { font-size:.72rem; color:#9ca3af; margin-top:2px; }
+.fid-credit { color:#16a34a; font-weight:800; }
+.fid-debit  { color:#dc2626; font-weight:800; }
+
 @media(max-width:768px) {
   .stats-row { grid-template-columns:1fr 1fr; }
   .profile-grid { grid-template-columns:1fr; }
@@ -353,8 +392,8 @@ body { font-family:var(--font); background:#f5f5f0; color:#1c1917; overflow-x:hi
 <!-- ===== TOPBAR ===== -->
 <div class="dash-top">
   <div class="container d-flex justify-content-between align-items-center">
-    <a href="/darousalam/" class="dash-brand">
-      <img src="/darousalam/logo.jpg" alt="Logo">
+    <a href="" class="dash-brand">
+      <img src="logo.jpg" alt="Logo">
       Darou Salam <span>Business Co.</span>
     </a>
     <div class="d-flex align-items-center gap-2">
@@ -613,6 +652,57 @@ body { font-family:var(--font); background:#f5f5f0; color:#1c1917; overflow-x:hi
             Mes adresses de livraison
           </a>
         </div>
+      </div>
+
+      <!-- Programme de fidelite -->
+      <div class="ds-card">
+        <div class="ds-card-head">
+          <div class="ds-card-title">
+            <i class="bi bi-star-fill" style="color:var(--or);"></i>
+            Programme de fidélité
+          </div>
+        </div>
+        <div style="padding:16px 20px 4px;">
+          <div style="text-align:center;padding-bottom:12px;">
+            <div class="fid-badge">
+              <i class="bi bi-star-fill"></i>
+              <?= number_format($pointsFidelite, 0, ',', ' ') ?> points
+            </div>
+            <?php if ($equivalentFCFA > 0): ?>
+            <div class="fid-equiv">
+              <i class="bi bi-gift-fill" style="color:var(--or);"></i>
+              Soit <?= number_format($equivalentFCFA, 0, ',', ' ') ?> FCFA de remise disponible
+            </div>
+            <?php else: ?>
+            <div class="fid-equiv" style="color:#6b7280;">
+              <i class="bi bi-info-circle"></i>
+              100 pts = 1 000 FCFA de remise · 1 pt / 1 000 FCFA dépensé
+            </div>
+            <?php endif; ?>
+          </div>
+        </div>
+        <?php if (!empty($historiquePoints)): ?>
+        <div style="border-top:1px solid #f3f4f6;">
+          <div style="padding:8px 16px 4px;font-size:.68rem;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;">
+            Derniers mouvements
+          </div>
+          <?php foreach ($historiquePoints as $h): ?>
+          <div class="fid-hist-row">
+            <div>
+              <div class="fid-hist-desc"><?= htmlspecialchars($h['description'] ?? '') ?></div>
+              <div class="fid-hist-date"><?= htmlspecialchars(date('d/m/Y H:i', strtotime($h['created_at']))) ?></div>
+            </div>
+            <div class="<?= $h['type'] === 'credit' ? 'fid-credit' : 'fid-debit' ?>">
+              <?= $h['type'] === 'credit' ? '+' : '−' ?><?= (int)$h['points'] ?> pts
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <div style="padding:12px 20px 16px;font-size:.82rem;color:#9ca3af;text-align:center;">
+          <i class="bi bi-clock-history"></i> Aucun mouvement pour le moment
+        </div>
+        <?php endif; ?>
       </div>
 
       <!-- Actions rapides -->

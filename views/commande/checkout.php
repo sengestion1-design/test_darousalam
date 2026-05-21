@@ -5,6 +5,27 @@ require_once __DIR__ . '/../layouts/header.php';
 
 <style>
 :root{--vert:#1a5c2a;--vert-l:#2d8a42;--orange:#f97316;--or:#d4a017;}
+
+/* Fidelite */
+.fidelite-box{
+  background:linear-gradient(135deg,#fffbeb,#fef3c7);
+  border:2px solid var(--or);border-radius:16px;
+  padding:18px 20px;margin-bottom:20px;
+}
+.fidelite-box-title{
+  font-weight:800;font-size:.95rem;color:#92400e;
+  display:flex;align-items:center;gap:8px;margin-bottom:10px;
+}
+.fidelite-box-title i{color:var(--or);font-size:1.1rem;}
+.fidelite-check-lbl{
+  display:flex;align-items:center;gap:10px;
+  cursor:pointer;font-size:.88rem;font-weight:600;color:#78350f;
+  padding:10px 14px;border-radius:10px;
+  border:1.5px solid #fde68a;background:rgba(255,255,255,.6);
+  transition:all .2s;
+}
+.fidelite-check-lbl:hover{background:rgba(255,255,255,.9);border-color:var(--or);}
+.fidelite-check-lbl input{width:17px;height:17px;accent-color:var(--or);}
 *{box-sizing:border-box;}
 
 .ck-wrap{display:grid;grid-template-columns:1fr 420px;gap:32px;align-items:start;}
@@ -407,6 +428,33 @@ require_once __DIR__ . '/../layouts/header.php';
         </div>
       </div>
 
+      <?php
+      // Bloc fidelite : afficher si client connecte avec >= 100 points
+      $_pointsFidelite = 0;
+      if (!empty($_SESSION['client_id'])) {
+          $_dbFid = Database::getInstance();
+          $_rowFid = $_dbFid->fetch("SELECT points_fidelite FROM clients WHERE id = :id", [':id' => $_SESSION['client_id']]);
+          $_pointsFidelite = (int)($_rowFid['points_fidelite'] ?? 0);
+      }
+      if ($_pointsFidelite >= 100):
+          $_remiseFid = (int)floor($_pointsFidelite / 100) * 1000;
+      ?>
+      <div class="fidelite-box" id="fidelite-box">
+        <div class="fidelite-box-title">
+          <i class="bi bi-star-fill"></i>
+          Programme de fidélité — Vous avez <span style="color:var(--or);"><?= number_format($_pointsFidelite, 0, ',', ' ') ?> points</span>
+          soit <span style="color:var(--or);"><?= number_format($_remiseFid, 0, ',', ' ') ?> FCFA</span> de remise disponible
+        </div>
+        <label class="fidelite-check-lbl">
+          <input type="checkbox" name="utiliser_points" id="cb-points" value="1"
+                 <?= !empty($_POST['utiliser_points']) ? 'checked' : '' ?>
+                 onchange="onPointsChange(this)">
+          <span>Utiliser mes points (−<?= number_format($_remiseFid, 0, ',', ' ') ?> FCFA sur cette commande)</span>
+        </label>
+        <input type="hidden" id="hidden-points-remise" value="<?= $_remiseFid ?>">
+      </div>
+      <?php endif; ?>
+
       <!-- Bouton en dehors de la carte, toujours visible -->
       <button type="submit" class="btn-confirm" style="margin-top:16px;">
         <i class="bi bi-check-circle-fill"></i> Confirmer la commande
@@ -509,6 +557,12 @@ require_once __DIR__ . '/../layouts/header.php';
           <span class="r-row-label"><i class="bi bi-scissors" style="color:#16a34a;"></i> Remise</span>
           <span class="r-row-val" id="val-remise" style="color:#16a34a;font-weight:700;"></span>
         </div>
+        <div class="r-row" id="row-points" style="display:none;">
+          <span class="r-row-label"><i class="bi bi-star-fill" style="color:var(--or);"></i> Fidélité</span>
+          <span class="r-row-val" style="color:#92400e;font-weight:700;">
+            <?php if (isset($_remiseFid)): ?>−<?= number_format($_remiseFid, 0, ',', ' ') ?> FCFA<?php endif; ?>
+          </span>
+        </div>
         <div class="r-row" id="row-livraison">
           <span class="r-row-label"><i class="bi bi-truck" style="color:var(--vert);"></i> Livraison</span>
           <span class="r-row-val" id="val-livraison" style="color:#9ca3af;">Choisir une zone</span>
@@ -543,12 +597,29 @@ require_once __DIR__ . '/../layouts/header.php';
 <script>
 var sousTotal = <?= $total ?>;
 var remiseAppliquee = 0;
+var remisePoints = 0;
 var fraisLivraison = 0;
 
 function recalcTotal() {
-    var t = sousTotal - remiseAppliquee + fraisLivraison;
+    var t = sousTotal - remiseAppliquee - remisePoints + fraisLivraison;
     document.getElementById('total-final').textContent = formatFCFA(Math.max(0, t));
 }
+
+function onPointsChange(cb) {
+    var hiddenPts = document.getElementById('hidden-points-remise');
+    if (!hiddenPts) return;
+    var montant = parseInt(hiddenPts.value) || 0;
+    remisePoints = cb.checked ? montant : 0;
+    var rowPts = document.getElementById('row-points');
+    if (rowPts) rowPts.style.display = cb.checked ? '' : 'none';
+    recalcTotal();
+}
+
+// Appliquer si déjà coché (rechargement page)
+window.addEventListener('DOMContentLoaded', function() {
+    var cb = document.getElementById('cb-points');
+    if (cb && cb.checked) onPointsChange(cb);
+});
 
 function setInfoBox(el, iconClass, text) {
     el.style.display = 'block';
