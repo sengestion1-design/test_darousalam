@@ -361,7 +361,29 @@ class AdminController
             );
         }
 
-        // Déduction stock désactivée (commande_details sans lien produit_id)
+        // Si réactivation depuis annulee → re-déduire le stock
+        if ($ancienStatut === 'annulee' && $statut !== 'annulee') {
+            $lignesCmd = $db->fetchAll(
+                "SELECT produit_id, quantite, unite FROM commande_details WHERE commande_id = :id",
+                [':id' => $id]
+            );
+            foreach ($lignesCmd as $ligne) {
+                $qte = (int)$ligne['quantite'];
+                if (($ligne['unite'] ?? 'kg') === 'carton') {
+                    $db->query(
+                        "UPDATE produits SET stock_cartons = GREATEST(0, stock_cartons - :q) WHERE id = :pid",
+                        [':q' => $qte, ':pid' => $ligne['produit_id']]
+                    );
+                } else {
+                    $db->query(
+                        "UPDATE produits SET stock_kg = GREATEST(0, stock_kg - :q) WHERE id = :pid",
+                        [':q' => $qte, ':pid' => $ligne['produit_id']]
+                    );
+                }
+            }
+            // Effacer la raison d'annulation
+            $db->query("UPDATE commandes SET raison_annulation = NULL WHERE id = :id", [':id' => $id]);
+        }
 
         // Envoyer email si le statut a changé et que le client a un email
         if ($commande && $ancienStatut !== $statut && !empty($commande['client_email'])) {
