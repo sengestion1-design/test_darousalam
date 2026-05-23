@@ -16,19 +16,20 @@ class Client
             return false;
         }
 
-        $sql = "INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, type, entreprise, mot_de_passe, statut, created_at)
-                VALUES (:nom, :prenom, :email, :telephone, :adresse, :ville, :type, :entreprise, :mot_de_passe, 'actif', NOW())";
+        $sql = "INSERT INTO clients (nom, prenom, email, telephone, adresse, ville, type_client, nom_entreprise, ninea, password, statut, created_at)
+                VALUES (:nom, :prenom, :email, :telephone, :adresse, :ville, :type_client, :nom_entreprise, :ninea, :password, 'actif', NOW())";
 
         $this->db->query($sql, [
-            ':nom'          => sanitize($data['nom']),
-            ':prenom'       => sanitize($data['prenom']),
-            ':email'        => sanitize($data['email']),
-            ':telephone'    => sanitize($data['telephone'] ?? ''),
-            ':adresse'      => sanitize($data['adresse'] ?? ''),
-            ':ville'        => sanitize($data['ville'] ?? ''),
-            ':type'         => in_array($data['type_client'], ['particulier', 'professionnel']) ? $data['type_client'] : 'particulier',
-            ':entreprise'   => sanitize($data['nom_entreprise'] ?? ''),
-            ':mot_de_passe' => password_hash($data['password'], PASSWORD_BCRYPT),
+            ':nom'           => sanitize($data['nom']),
+            ':prenom'        => sanitize($data['prenom']),
+            ':email'         => sanitize($data['email']),
+            ':telephone'     => sanitize($data['telephone'] ?? ''),
+            ':adresse'       => sanitize($data['adresse'] ?? ''),
+            ':ville'         => sanitize($data['ville'] ?? ''),
+            ':type_client'   => in_array($data['type_client'], ['particulier', 'professionnel']) ? $data['type_client'] : 'particulier',
+            ':nom_entreprise' => sanitize($data['nom_entreprise'] ?? ''),
+            ':ninea'         => sanitize($data['ninea'] ?? ''),
+            ':password'      => password_hash($data['password'], PASSWORD_BCRYPT),
         ]);
 
         return (int)$this->db->lastInsertId();
@@ -47,7 +48,7 @@ class Client
     public function verifyPassword(string $email, string $password): array|false
     {
         $client = $this->findByEmail($email);
-        if ($client && password_verify($password, $client['mot_de_passe'])) {
+        if ($client && password_verify($password, $client['password'])) {
             return $client;
         }
         return false;
@@ -66,13 +67,13 @@ class Client
             }
         }
         if (isset($data['nom_entreprise'])) {
-            $fields[] = "entreprise = :entreprise";
-            $params[':entreprise'] = sanitize($data['nom_entreprise']);
+            $fields[] = "nom_entreprise = :nom_entreprise";
+            $params[':nom_entreprise'] = sanitize($data['nom_entreprise']);
         }
 
         if (!empty($data['password'])) {
-            $fields[] = "mot_de_passe = :mot_de_passe";
-            $params[':mot_de_passe'] = password_hash($data['password'], PASSWORD_BCRYPT);
+            $fields[] = "password = :password";
+            $params[':password'] = password_hash($data['password'], PASSWORD_BCRYPT);
         }
 
         if (empty($fields)) return false;
@@ -111,7 +112,7 @@ class Client
         if (!$client) return false;
 
         $this->db->query(
-            "UPDATE clients SET mot_de_passe = :pwd, reset_token = NULL, reset_expires = NULL WHERE id = :id",
+            "UPDATE clients SET password = :pwd, reset_token = NULL, reset_expires = NULL WHERE id = :id",
             [':pwd' => password_hash($newPassword, PASSWORD_BCRYPT), ':id' => $client['id']]
         );
         return true;
@@ -127,7 +128,7 @@ class Client
     {
         $offset = ($page - 1) * $perPage;
         return $this->db->fetchAll(
-            "SELECT id, nom, prenom, email, telephone, type, statut, created_at FROM clients ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+            "SELECT id, nom, prenom, email, telephone, type_client, statut, created_at FROM clients ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
             [':limit' => $perPage, ':offset' => $offset]
         );
     }

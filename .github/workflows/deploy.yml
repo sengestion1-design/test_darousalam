@@ -14,39 +14,19 @@ jobs:
       - name: Deploy via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASS }}
+          server: access971979113.webspace-data.io
+          username: acc1409879694
+          password: ${{ secrets.SFTP_PASS }}
           port: 22
           local_path: ./
-          remote_path: /test_darousalam/test_darousalam/test_darousalam/test_darousalam/
+          remote_path: /darousalam/
           sftp_only: true
           args: '-o StrictHostKeyChecking=no'
-
-      - name: Fix permissions via sftp
-        run: |
-          sudo apt-get install -y sshpass
-          sshpass -p '${{ secrets.FTP_PASS }}' sftp -o StrictHostKeyChecking=no -P 22 '${{ secrets.FTP_USER }}@${{ secrets.FTP_HOST }}' << 'SFTPEOF'
-          chmod 755 test_darousalam
-          chmod 644 test_darousalam/test_darousalam/.htaccess
-          chmod 644 test_darousalam/test_darousalam/index.php
-          chmod 644 test_darousalam/test_darousalam/composer.json
-          chmod 644 test_darousalam/test_darousalam/composer.lock
-          chmod 755 test_darousalam/test_darousalam/src
-          chmod 755 test_darousalam/test_darousalam/views
-          chmod 755 test_darousalam/test_darousalam/vendor
-          chmod 755 test_darousalam/test_darousalam/public
-          chmod 755 test_darousalam/test_darousalam/config
-          chmod 755 test_darousalam/test_darousalam/sql
-          chmod 755 test_darousalam/test_darousalam/photos
-          chmod 644 test_darousalam/test_darousalam/src/Controllers/AuthController.php
-          chmod 644 test_darousalam/test_darousalam/src/Controllers/ProduitController.php
-          chmod 644 test_darousalam/test_darousalam/src/Controllers/CommandeController.php
-          chmod 644 test_darousalam/test_darousalam/src/Controllers/AdminController.php
-          chmod 644 test_darousalam/test_darousalam/src/Models/Client.php
-          chmod 644 test_darousalam/test_darousalam/src/Models/Produit.php
-          chmod 644 test_darousalam/test_darousalam/src/Models/Commande.php
-          chmod 644 test_darousalam/test_darousalam/src/Models/Database.php
-          chmod 644 test_darousalam/test_darousalam/config/database.php
-          chmod 644 test_darousalam/test_darousalam/config/mail.php
-          SFTPEOF
+          delete_remote_files: false
+          exclude: |
+            .git
+            .github
+            node_modules
+            .env
+            config/database.php
+            tmp/mpdf
