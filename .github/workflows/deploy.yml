@@ -19,8 +19,14 @@ jobs:
           password: ${{ secrets.SFTP_PASS }}
           port: 22
           local_path: ./
-          remote_path: /
+          remote_path: /darousalam/
           sftp_only: true
           args: '-o StrictHostKeyChecking=no'
           delete_remote_files: false
-          sftpArgs: '-o StrictHostKeyChecking=no'
+          exclude: |
+            .git
+            .github
+            node_modules
+            .env
+            config/database.php
+            tmp/mpdf
