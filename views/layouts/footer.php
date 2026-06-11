@@ -17,7 +17,7 @@
             <!-- Col 1 : Brand -->
             <div class="col-lg-4 col-md-6">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                    <img src="/darousalam/logo.jpg" alt="Logo" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid #d4a017;box-shadow:0 0 0 3px rgba(212,160,23,.2);">
+                    <img src="logo.jpg" alt="Logo" style="width:44px;height:44px;object-fit:cover;border-radius:50%;border:2px solid #d4a017;box-shadow:0 0 0 3px rgba(212,160,23,.2);">
                     <div>
                         <div style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.1rem;color:#fff;">Darou Salam</div>
                         <div style="font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:#d4a017;">Business Company</div>
@@ -31,14 +31,14 @@
                     <a href="https://wa.me/221774715353" target="_blank" class="footer-social" style="background:#25D366;" title="WhatsApp">
                         <i class="bi bi-whatsapp"></i>
                     </a>
-                    <a href="#" class="footer-social" style="background:#1877F2;" title="Facebook">
+                    <a href="https://www.facebook.com/profile.php?id=61590522353210" target="_blank" class="footer-social" style="background:#1877F2;" title="Facebook">
                         <i class="bi bi-facebook"></i>
                     </a>
-                    <a href="#" class="footer-social" style="background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);" title="Instagram">
+                    <a href="https://www.instagram.com/darousalamcontact1/" target="_blank" class="footer-social" style="background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);" title="Instagram">
                         <i class="bi bi-instagram"></i>
                     </a>
-                    <a href="#" class="footer-social" style="background:#0077B5;" title="LinkedIn">
-                        <i class="bi bi-linkedin"></i>
+                    <a href="https://www.tiktok.com/@darou.salam.business" target="_blank" class="footer-social" style="background:#010101;" title="TikTok">
+                        <i class="bi bi-tiktok"></i>
                     </a>
                 </div>
             </div>
@@ -47,12 +47,12 @@
             <div class="col-lg-2 col-md-6 col-6">
                 <h6 class="footer-heading">Navigation</h6>
                 <ul class="footer-links">
-                    <li><a href="/darousalam/">Accueil</a></li>
-                    <li><a href="/darousalam/catalogue">Catalogue</a></li>
-                    <li><a href="/darousalam/apropos">À propos</a></li>
-                    <li><a href="/darousalam/contact">Contact</a></li>
-                    <li><a href="/darousalam/compte">Mon compte</a></li>
-                    <li><a href="/darousalam/panier">Mon panier</a></li>
+                    <li><a href="">Accueil</a></li>
+                    <li><a href="catalogue">Catalogue</a></li>
+                    <li><a href="apropos">À propos</a></li>
+                    <li><a href="contact">Contact</a></li>
+                    <li><a href="compte">Mon compte</a></li>
+                    <li><a href="panier">Mon panier</a></li>
                 </ul>
             </div>
 
@@ -60,12 +60,12 @@
             <div class="col-lg-2 col-md-6 col-6">
                 <h6 class="footer-heading">Nos Fruits</h6>
                 <ul class="footer-links">
-                    <li><a href="/darousalam/catalogue?cat=mangues">Mangues</a></li>
-                    <li><a href="/darousalam/catalogue?cat=avocats">Avocats</a></li>
-                    <li><a href="/darousalam/catalogue?cat=kiwis">Kiwis</a></li>
-                    <li><a href="/darousalam/catalogue?cat=oranges">Oranges</a></li>
-                    <li><a href="/darousalam/catalogue?cat=pommes">Pommes</a></li>
-                    <li><a href="/darousalam/catalogue?cat=melon">Melons & Pastèques</a></li>
+                    <li><a href="catalogue?cat=mangues">Mangues</a></li>
+                    <li><a href="catalogue?cat=avocats">Avocats</a></li>
+                    <li><a href="catalogue?cat=kiwis">Kiwis</a></li>
+                    <li><a href="catalogue?cat=oranges">Oranges</a></li>
+                    <li><a href="catalogue?cat=pommes">Pommes</a></li>
+                    <li><a href="catalogue?cat=melon">Melons & Pastèques</a></li>
                 </ul>
             </div>
 
@@ -93,13 +93,54 @@
                 <!-- Newsletter mini -->
                 <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px;">
                     <p style="font-size:.85rem;margin-bottom:8px;color:#fff;">Recevez nos offres et actualités :</p>
-                    <form class="d-flex gap-2" style="flex-wrap:nowrap;">
-                        <input type="email" placeholder="votre@email.com" style="flex:1;min-width:0;width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-size:.82rem;padding:8px 12px;outline:none;" onfocus="this.style.borderColor='#d4a017'" onblur="this.style.borderColor='rgba(255,255,255,.2)'">
-                        <button type="submit" style="background:#f97316;border:none;border-radius:8px;color:#fff;padding:8px 14px;font-size:.82rem;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .2s;" onmouseover="this.style.background='#ea6400'" onmouseout="this.style.background='#f97316'">
-                            <i class="bi bi-send-fill"></i>
+                    <form id="newsletter-footer-form" class="d-flex gap-2" style="flex-wrap:nowrap;" onsubmit="newsletterFooterSubmit(event)">
+                        <input type="email" id="newsletter-footer-email" name="email" placeholder="votre@email.com" required style="flex:1;min-width:0;width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-size:.82rem;padding:8px 12px;outline:none;" onfocus="this.style.borderColor='#d4a017'" onblur="this.style.borderColor='rgba(255,255,255,.2)'">
+                        <button type="submit" id="newsletter-footer-btn" style="background:#f97316;border:none;border-radius:8px;color:#fff;padding:8px 14px;font-size:.82rem;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .2s;" onmouseover="this.style.background='#ea6400'" onmouseout="this.style.background='#f97316'">
+                            <i class="bi bi-send-fill" id="newsletter-footer-icon"></i>
                         </button>
                     </form>
+                    <div id="newsletter-footer-msg" style="display:none;margin-top:8px;font-size:.82rem;border-radius:6px;padding:6px 10px;"></div>
                 </div>
+<script>
+function newsletterFooterSubmit(e) {
+    e.preventDefault();
+    var btn   = document.getElementById('newsletter-footer-btn');
+    var icon  = document.getElementById('newsletter-footer-icon');
+    var email = document.getElementById('newsletter-footer-email').value;
+    var msg   = document.getElementById('newsletter-footer-msg');
+    btn.disabled = true;
+    icon.className = 'bi bi-hourglass-split';
+    var fd = new FormData();
+    fd.append('email', email);
+    fetch('<?= BASE_URL ?>?page=newsletter_subscribe', {method: 'POST', body: fd})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            msg.style.display = 'block';
+            if (data.success) {
+                msg.style.background = 'rgba(34,197,94,.18)';
+                msg.style.color = '#86efac';
+                msg.style.border = '1px solid rgba(34,197,94,.3)';
+                document.getElementById('newsletter-footer-email').value = '';
+            } else {
+                msg.style.background = 'rgba(239,68,68,.18)';
+                msg.style.color = '#fca5a5';
+                msg.style.border = '1px solid rgba(239,68,68,.3)';
+            }
+            msg.textContent = data.message;
+            btn.disabled = false;
+            icon.className = 'bi bi-send-fill';
+        })
+        .catch(function() {
+            msg.style.display = 'block';
+            msg.style.background = 'rgba(239,68,68,.18)';
+            msg.style.color = '#fca5a5';
+            msg.style.border = '1px solid rgba(239,68,68,.3)';
+            msg.textContent = 'Erreur réseau. Veuillez réessayer.';
+            btn.disabled = false;
+            icon.className = 'bi bi-send-fill';
+        });
+}
+</script>
             </div>
         </div>
 
@@ -115,11 +156,13 @@
             </div>
             <div class="col-md-6 text-center text-md-end">
                 <span style="font-size:.78rem;color:rgba(255,255,255,.45);">
-                    <a href="#" style="color:rgba(255,255,255,.45);text-decoration:none;">Mentions légales</a>
+                    <a href="<?= BASE_URL ?>?page=mentions_legales" style="color:rgba(255,255,255,.45);text-decoration:none;">Mentions légales</a>
                     &nbsp;·&nbsp;
-                    <a href="#" style="color:rgba(255,255,255,.45);text-decoration:none;">Confidentialité</a>
+                    <a href="<?= BASE_URL ?>?page=politique_confidentialite" style="color:rgba(255,255,255,.45);text-decoration:none;">Confidentialité</a>
                     &nbsp;·&nbsp;
-                    <a href="#" style="color:rgba(255,255,255,.45);text-decoration:none;">CGV</a>
+                    <a href="<?= BASE_URL ?>?page=cgv" style="color:rgba(255,255,255,.45);text-decoration:none;">CGV</a>
+                    &nbsp;·&nbsp;
+                    <a href="<?= BASE_URL ?>?page=faq" style="color:rgba(255,255,255,.45);text-decoration:none;">FAQ</a>
                 </span>
             </div>
         </div>
@@ -212,11 +255,11 @@
 .footer-links a:hover::before { opacity: 1; }
 
 .footer-social {
-    width: 30px; height: 30px;
+    width: 44px; height: 44px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     color: #fff;
-    font-size: .85rem;
+    font-size: 1.1rem;
     text-decoration: none;
     transition: transform .2s, box-shadow .2s;
     flex-shrink: 0;
