@@ -10,18 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get changed files
+        id: changed
+        run: |
+          echo "files=$(git diff --name-only HEAD~1 HEAD | grep -v '^\.git' | grep -v '^\.github' | grep -v '^\.env' | grep -v '^config/database' | grep -v '^tmp/' | grep -v '^photos/' | tr '\n' ' ')" >> $GITHUB_OUTPUT
 
       - name: Install lftp
         run: sudo apt-get install -y lftp
 
-      - name: Deploy via SFTP with lftp
+      - name: Deploy changed files via SFTP
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SFTP_PASS: ${{ secrets.SFTP_PASS }}
+          CHANGED: ${{ steps.changed.outputs.files }}
         run: |
-          lftp -u "$SFTP_USER","$SFTP_PASS" sftp://$SFTP_HOST -e "
-            set sftp:auto-confirm yes;
-            set net:timeout 30;
-            mirror -R --delete --exclude=.git --exclude=.github --exclude=.env --exclude=config/database.php --exclude=tmp/mpdf --exclude=node_modules --exclude=photos . /darousalam-business/;
-            quit"
+          for file in $CHANGED; do
+            echo "Uploading $file..."
+            lftp -u "$SFTP_USER","$SFTP_PASS" sftp://$SFTP_HOST -e "
+              set sftp:auto-confirm yes;
+              set net:timeout 30;
+              put $file -o /$file;
+              quit"
+          done
