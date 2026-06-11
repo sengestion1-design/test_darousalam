@@ -11,15 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy via SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
-        with:
-          server: access971979113.webspace-data.io
-          username: acc1409879694
-          password: ${{ secrets.SFTP_PASS }}
-          port: 22
-          local_path: ./
-          remote_path: /darousalam-business/
-          sftp_only: true
-          args: '-o StrictHostKeyChecking=no'
-          delete_remote_files: false
+      - name: Install lftp
+        run: sudo apt-get install -y lftp
+
+      - name: Deploy via SFTP with lftp
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PASS: ${{ secrets.SFTP_PASS }}
+        run: |
+          lftp -u "$SFTP_USER","$SFTP_PASS" sftp://$SFTP_HOST -e "
+            set sftp:auto-confirm yes;
+            set net:timeout 30;
+            mirror -R --delete --exclude=.git --exclude=.github --exclude=.env --exclude=config/database.php --exclude=tmp/mpdf --exclude=node_modules --exclude=photos . /darousalam-business/;
+            quit"
